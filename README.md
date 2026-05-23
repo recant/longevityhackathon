@@ -42,6 +42,40 @@ Optional `OPENAI_API_KEY` adds “explain like a caring family member” + conve
 
 See [HACKATHON.md](./HACKATHON.md) for pitch and [REFERENCES.md](./REFERENCES.md) for full bibliography.
 
+## Run / test via GitHub
+
+### Automated tests (GitHub Actions)
+
+Every push to `main` runs CI: [Actions tab](https://github.com/recant/longevityhackathon/actions)
+
+1. Open **https://github.com/recant/longevityhackathon**
+2. Click **Actions** → workflow **CI** → latest run
+3. Green check = scoring tests + client build passed
+
+To trigger manually: **Actions** → **CI** → **Run workflow**.
+
+### Clone and run on your machine
+
+```powershell
+git clone https://github.com/recant/longevityhackathon.git
+cd longevityhackathon
+```
+
+Then follow **Run locally** below.
+
+### Quick API check (no UI)
+
+```powershell
+cd server
+python -m venv .venv
+.venv\Scripts\activate
+pip install -r requirements.txt pytest
+pytest tests/ -v
+uvicorn main:app --port 8000
+```
+
+In another terminal: open http://127.0.0.1:8000/api/health — should return `{"status":"ok","app":"kinspan"}`.
+
 ## Run locally
 
 **Server**
