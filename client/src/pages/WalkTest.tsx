@@ -1,33 +1,80 @@
-import { useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { Link } from "react-router-dom";
 import { saveGait, type CategoryScore } from "../api";
 
+type WalkState = "idle" | "running" | "paused" | "stopped";
+
 export default function WalkTest() {
-  const [running, setRunning] = useState(false);
+  const [walkState, setWalkState] = useState<WalkState>("idle");
+  const [displaySec, setDisplaySec] = useState<number | null>(null);
   const [elapsed, setElapsed] = useState<number | null>(null);
   const [manual, setManual] = useState("");
   const [saving, setSaving] = useState(false);
   const [scores, setScores] = useState<CategoryScore | null>(null);
-  const startRef = useRef(0);
+
+  const accumRef = useRef(0);
+  const segStartRef = useRef(0);
   const tickRef = useRef<ReturnType<typeof setInterval> | null>(null);
+
+  const stopTick = () => {
+    if (tickRef.current) {
+      clearInterval(tickRef.current);
+      tickRef.current = null;
+    }
+  };
+
+  const refreshDisplay = useCallback(() => {
+    setDisplaySec(accumRef.current + (performance.now() - segStartRef.current) / 1000);
+  }, []);
+
+  useEffect(() => () => stopTick(), []);
 
   const start = () => {
     setScores(null);
     setElapsed(null);
     setManual("");
-    startRef.current = performance.now();
-    setRunning(true);
-    tickRef.current = setInterval(() => {
-      setElapsed((performance.now() - startRef.current) / 1000);
-    }, 50);
+    accumRef.current = 0;
+    segStartRef.current = performance.now();
+    setWalkState("running");
+    stopTick();
+    tickRef.current = setInterval(refreshDisplay, 50);
+  };
+
+  const pause = () => {
+    if (walkState !== "running") return;
+    accumRef.current += (performance.now() - segStartRef.current) / 1000;
+    stopTick();
+    setWalkState("paused");
+    setDisplaySec(accumRef.current);
+  };
+
+  const resume = () => {
+    if (walkState !== "paused") return;
+    segStartRef.current = performance.now();
+    setWalkState("running");
+    stopTick();
+    tickRef.current = setInterval(refreshDisplay, 50);
   };
 
   const stop = () => {
-    if (tickRef.current) clearInterval(tickRef.current);
-    const sec = (performance.now() - startRef.current) / 1000;
+    if (walkState === "running") {
+      accumRef.current += (performance.now() - segStartRef.current) / 1000;
+    }
+    const sec = accumRef.current;
     setElapsed(sec);
-    setRunning(false);
+    setDisplaySec(sec);
     setManual(sec.toFixed(2));
+    setWalkState("stopped");
+  };
+
+  const reset = () => {
+    stopTick();
+    accumRef.current = 0;
+    setWalkState("idle");
+    setDisplaySec(null);
+    setElapsed(null);
+    setManual("");
+    setScores(null);
   };
 
   const submit = async () => {
@@ -45,30 +92,39 @@ export default function WalkTest() {
   };
 
   const speed =
-    elapsed && elapsed > 0 ? (3.048 / elapsed).toFixed(2) : manual ? (3.048 / parseFloat(manual)).toFixed(2) : null;
+    displaySec && displaySec > 0
+      ? (3.048 / displaySec).toFixed(2)
+      : manual
+        ? (3.048 / parseFloat(manual)).toFixed(2)
+        : null;
 
   return (
     <section className="card">
       <h2>Mobility — 10-foot walk</h2>
       <p className="muted">
         Mark 10 feet on the floor (3.05 m). Parent walks at a <strong>comfortable</strong> pace; time
-        from first movement to crossing the line. Scored against age/sex norms (Bohannon &amp;
-        Andrews, 2011); pace bands follow Studenski et al. (JAMA 2011).
+        from first movement to crossing the line. Use Pause if they need a brief break mid-walk.
       </p>
       <div className="timer-display">
-        {running ? elapsed?.toFixed(2) ?? "0.00" : elapsed?.toFixed(2) ?? "—"}s
+        {displaySec != null ? displaySec.toFixed(2) : "—"}s
+        {walkState === "paused" && <span className="muted"> (paused)</span>}
       </div>
       <div style={{ display: "flex", gap: "0.5rem", flexWrap: "wrap" }}>
-        {!running && !elapsed && (
-          <button type="button" className="btn" onClick={start}>
-            Start timer
-          </button>
-        )}
-        {running && (
-          <button type="button" className="btn" onClick={stop}>
-            Stop at 10 ft
-          </button>
-        )}
+        <button type="button" className="btn" onClick={start} disabled={walkState === "running" || walkState === "paused"}>
+          Start
+        </button>
+        <button type="button" className="btn secondary" onClick={pause} disabled={walkState !== "running"}>
+          Pause
+        </button>
+        <button type="button" className="btn secondary" onClick={resume} disabled={walkState !== "paused"}>
+          Resume
+        </button>
+        <button type="button" className="btn secondary" onClick={stop} disabled={walkState === "idle" || walkState === "stopped"}>
+          Stop at 10 ft
+        </button>
+        <button type="button" className="btn secondary" onClick={reset}>
+          Reset
+        </button>
       </div>
       <label className="field-label" style={{ marginTop: "1rem" }}>
         Or enter time manually (seconds)

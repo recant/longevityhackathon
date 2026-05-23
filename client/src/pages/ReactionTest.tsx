@@ -21,6 +21,15 @@ export default function ReactionTest() {
     }
   };
 
+  const resetTest = useCallback(() => {
+    clearTimer();
+    setPhase("idle");
+    setTrials([]);
+    setMessage("");
+    setScores(null);
+    setSaving(false);
+  }, []);
+
   const startTrial = useCallback(() => {
     clearTimer();
     setMessage("Wait for green…");
@@ -34,6 +43,7 @@ export default function ReactionTest() {
   }, []);
 
   const onPadClick = () => {
+    if (phase === "done") return;
     if (phase === "idle") {
       setTrials([]);
       setScores(null);
@@ -43,7 +53,7 @@ export default function ReactionTest() {
     if (phase === "waiting") {
       clearTimer();
       setPhase("idle");
-      setMessage("Too soon — tap Start to try again.");
+      setMessage("Too soon — use Redo test or tap the pad to start over.");
       return;
     }
     if (phase === "go") {
@@ -52,7 +62,7 @@ export default function ReactionTest() {
       setTrials(next);
       if (next.length >= TRIALS) {
         setPhase("done");
-        setMessage(`Nice! Median ${median(next)} ms`);
+        setMessage(`All done! Median ${median(next)} ms — save or redo.`);
       } else {
         setMessage(`Trial ${next.length}/${TRIALS}`);
         setPhase("waiting");
@@ -74,6 +84,8 @@ export default function ReactionTest() {
     }
   };
 
+  const showRedo = trials.length > 0 || phase === "done" || scores !== null;
+
   return (
     <section className="card">
       <h2>Cognitive Speed</h2>
@@ -86,25 +98,38 @@ export default function ReactionTest() {
         onClick={onPadClick}
         role="button"
         tabIndex={0}
+        onKeyDown={(e) => e.key === " " && onPadClick()}
       >
-        {phase === "idle" ? "Tap to start" : message}
+        {phase === "idle" && !message ? "Tap to start" : message || "Tap to start"}
       </div>
       {trials.length > 0 && (
         <p className="muted">Trials (ms): {trials.join(", ")}</p>
       )}
-      {phase === "done" && !scores && (
-        <button className="btn block" type="button" disabled={saving} onClick={save}>
-          {saving ? "Saving…" : "Save & see insight"}
-        </button>
-      )}
+      <div style={{ display: "flex", flexWrap: "wrap", gap: "0.5rem" }}>
+        {phase === "done" && !scores && (
+          <button className="btn" type="button" disabled={saving} onClick={save}>
+            {saving ? "Saving…" : "Save & see insight"}
+          </button>
+        )}
+        {showRedo && (
+          <button className="btn secondary" type="button" onClick={resetTest}>
+            Redo test
+          </button>
+        )}
+      </div>
       {scores && (
         <div className="result-panel">
           <strong>{scores.label}</strong> — score {scores.score}/100
           <p>{scores.interpretation}</p>
           <p className="muted">Functional age estimate: {scores.functional_age}</p>
-          <Link className="btn secondary" to="/dashboard" style={{ marginTop: "0.75rem" }}>
-            View trajectory
-          </Link>
+          <div style={{ display: "flex", flexWrap: "wrap", gap: "0.5rem", marginTop: "0.75rem" }}>
+            <Link className="btn secondary" to="/dashboard">
+              View trajectory
+            </Link>
+            <button className="btn secondary" type="button" onClick={resetTest}>
+              Redo test
+            </button>
+          </div>
         </div>
       )}
     </section>
