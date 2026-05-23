@@ -2,7 +2,9 @@ import { useRef, useState } from "react";
 import { Link } from "react-router-dom";
 import type { CategoryScore } from "../api";
 
-export default function VideoChair() {
+type Props = { embedded?: boolean; onSaved?: () => void };
+
+export default function VideoChair({ embedded, onSaved }: Props = {}) {
   const [uploading, setUploading] = useState(false);
   const [scores, setScores] = useState<CategoryScore | null>(null);
   const [cv, setCv] = useState<Record<string, unknown> | null>(null);
@@ -28,6 +30,7 @@ export default function VideoChair() {
       const data = await res.json();
       setScores(data.scores);
       setCv(data.cv);
+      onSaved?.();
     } catch (e) {
       alert(e instanceof Error ? e.message : "Upload failed");
     } finally {
@@ -35,8 +38,9 @@ export default function VideoChair() {
     }
   };
 
+  const Tag = embedded ? "div" : "section";
   return (
-    <section className="card">
+    <Tag className={embedded ? "" : "card"}>
       <h2>Video — chair stand</h2>
       <p className="muted">
         Film about 30 seconds of sit-to-stand reps. Computer vision counts stands and scores leg
@@ -70,11 +74,13 @@ export default function VideoChair() {
               CV counted ~{String(cv.reps_30s_est)} stands ({String(cv.method)})
             </p>
           )}
-          <Link className="btn secondary" to="/dashboard" style={{ marginTop: "0.75rem" }}>
-            View trajectory
-          </Link>
+          {!embedded && (
+            <Link className="btn secondary" to="/dashboard" style={{ marginTop: "0.75rem" }}>
+              View trajectory
+            </Link>
+          )}
         </div>
       )}
-    </section>
+    </Tag>
   );
 }

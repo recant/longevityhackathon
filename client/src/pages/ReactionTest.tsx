@@ -5,7 +5,9 @@ import { saveReaction, type CategoryScore } from "../api";
 const TRIALS = 5;
 type Phase = "idle" | "waiting" | "go" | "done";
 
-export default function ReactionTest() {
+type Props = { embedded?: boolean; onSaved?: () => void };
+
+export default function ReactionTest({ embedded, onSaved }: Props = {}) {
   const [phase, setPhase] = useState<Phase>("idle");
   const [trials, setTrials] = useState<number[]>([]);
   const [message, setMessage] = useState("");
@@ -77,6 +79,7 @@ export default function ReactionTest() {
     try {
       const res = await saveReaction(trials);
       setScores(res.scores);
+      onSaved?.();
     } catch (e) {
       setMessage(e instanceof Error ? e.message : "Save failed");
     } finally {
@@ -86,8 +89,9 @@ export default function ReactionTest() {
 
   const showRedo = trials.length > 0 || phase === "done" || scores !== null;
 
+  const Tag = embedded ? "div" : "section";
   return (
-    <section className="card">
+    <Tag className={embedded ? "" : "card"}>
       <h2>Cognitive Speed</h2>
       <p className="muted">
         Parent taps when the circle turns green (simple reaction time). Scored vs age norms from
@@ -123,16 +127,18 @@ export default function ReactionTest() {
           <p>{scores.interpretation}</p>
           <p className="muted">Functional age estimate: {scores.functional_age}</p>
           <div style={{ display: "flex", flexWrap: "wrap", gap: "0.5rem", marginTop: "0.75rem" }}>
-            <Link className="btn secondary" to="/dashboard">
-              View trajectory
-            </Link>
+            {!embedded && (
+              <Link className="btn secondary" to="/dashboard">
+                View trajectory
+              </Link>
+            )}
             <button className="btn secondary" type="button" onClick={resetTest}>
               Redo test
             </button>
           </div>
         </div>
       )}
-    </section>
+    </Tag>
   );
 }
 

@@ -83,7 +83,7 @@ In another terminal: open http://127.0.0.1:8000/api/health — should return `{"
 | **At-home tests** | Stopwatch, tap pad, chair counter | Reaction, 10-ft walk, 30s chair stand |
 | **Video analysis** | OpenCV (+ optional MediaPipe) on uploaded video | Walk gait (speed, cadence, symmetry), chair reps from video; reaction still manual |
 
-Choose your path at the top of the UI. For better pose tracking: `pip install -r requirements-cv.txt`
+Choose your path at the top of the UI, then follow the **guided check-in** (stepper, Back/Continue) — each path has its own step order. For better pose tracking: `pip install -r requirements-cv.txt`
 
 ## Run locally (basic test UI — recommended)
 
@@ -96,7 +96,10 @@ pip install -r requirements.txt
 uvicorn main:app --reload --port 8000
 ```
 
-Open **http://localhost:8000** — built-in test UI for profile, all three biomarkers, and dashboard.
+Open **http://localhost:8000** — guided step-by-step check-in (built-in UI).
+
+**At-home path:** Profile → Reaction → Walk → Chair → Results  
+**Video path:** Profile → Video walk → Video chair → Reaction → Results
 
 ## Run React client (optional)
 
@@ -106,7 +109,7 @@ npm install
 npm run dev
 ```
 
-Open http://localhost:5173 (proxies API to port 8000; keep server running).
+Open http://localhost:5173 (proxies API to port 8000; keep server running). Use **Guided check-in** in the nav for the same workflow as the built-in UI.
 
 ## API (MVP)
 

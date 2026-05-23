@@ -2,7 +2,9 @@ import { useRef, useState } from "react";
 import { Link } from "react-router-dom";
 import type { CategoryScore } from "../api";
 
-export default function VideoWalk() {
+type Props = { embedded?: boolean; onSaved?: () => void };
+
+export default function VideoWalk({ embedded, onSaved }: Props = {}) {
   const [distance, setDistance] = useState("3.048");
   const [uploading, setUploading] = useState(false);
   const [scores, setScores] = useState<CategoryScore | null>(null);
@@ -30,6 +32,7 @@ export default function VideoWalk() {
       const data = await res.json();
       setScores(data.scores);
       setCv(data.cv);
+      onSaved?.();
     } catch (e) {
       alert(e instanceof Error ? e.message : "Upload failed");
     } finally {
@@ -37,8 +40,9 @@ export default function VideoWalk() {
     }
   };
 
+  const Tag = embedded ? "div" : "section";
   return (
-    <section className="card">
+    <Tag className={embedded ? "" : "card"}>
       <h2>Video — walking gait</h2>
       <p className="muted">
         Record 10–15 seconds with the full body visible (side view works best). Computer vision
@@ -80,11 +84,13 @@ export default function VideoWalk() {
               {String(cv.method)}
             </p>
           )}
-          <Link className="btn secondary" to="/dashboard" style={{ marginTop: "0.75rem" }}>
-            View trajectory
-          </Link>
+          {!embedded && (
+            <Link className="btn secondary" to="/dashboard" style={{ marginTop: "0.75rem" }}>
+              View trajectory
+            </Link>
+          )}
         </div>
       )}
-    </section>
+    </Tag>
   );
 }

@@ -4,7 +4,9 @@ import { saveChairStand, type CategoryScore } from "../api";
 
 const DURATION = 30;
 
-export default function ChairStandTest() {
+type Props = { embedded?: boolean; onSaved?: () => void };
+
+export default function ChairStandTest({ embedded, onSaved }: Props = {}) {
   const [phase, setPhase] = useState<"idle" | "running" | "done">("idle");
   const [secondsLeft, setSecondsLeft] = useState(DURATION);
   const [reps, setReps] = useState(0);
@@ -50,6 +52,7 @@ export default function ChairStandTest() {
     try {
       const res = await saveChairStand(reps);
       setScores(res.scores);
+      onSaved?.();
     } catch (e) {
       alert(e instanceof Error ? e.message : "Save failed");
     } finally {
@@ -57,8 +60,9 @@ export default function ChairStandTest() {
     }
   };
 
+  const Tag = embedded ? "div" : "section";
   return (
-    <section className="card">
+    <Tag className={embedded ? "" : "card"}>
       <h2>Strength & Stability — chair stand</h2>
       <p className="muted">
         <strong>CDC STEADI 30-second chair stand:</strong> sturdy chair, arms crossed on chest if
@@ -97,11 +101,13 @@ export default function ChairStandTest() {
           <strong>{scores.label}</strong> — score {scores.score}/100
           <p>{scores.interpretation}</p>
           <p className="muted">Functional age estimate: {scores.functional_age}</p>
-          <Link className="btn secondary" to="/dashboard">
-            View trajectory
-          </Link>
+          {!embedded && (
+            <Link className="btn secondary" to="/dashboard">
+              View trajectory
+            </Link>
+          )}
         </div>
       )}
-    </section>
+    </Tag>
   );
 }

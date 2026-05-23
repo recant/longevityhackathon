@@ -358,3 +358,108 @@ label.field-label {
   height: 100%;
   object-fit: cover;
 }
+
+.workflow-stepper {
+  display: flex;
+  gap: 0.35rem;
+  overflow-x: auto;
+  padding: 0.5rem 0 1rem;
+  margin-bottom: 0.5rem;
+}
+
+.workflow-step {
+  flex: 1;
+  min-width: 4.5rem;
+  text-align: center;
+  opacity: 0.55;
+}
+
+.workflow-step.active {
+  opacity: 1;
+}
+
+.workflow-step.done {
+  opacity: 1;
+}
+
+.workflow-step-num {
+  width: 1.75rem;
+  height: 1.75rem;
+  margin: 0 auto 0.25rem;
+  border-radius: 50%;
+  background: var(--card);
+  border: 2px solid var(--secondary-soft);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 0.75rem;
+  font-weight: 800;
+}
+
+.workflow-step.active .workflow-step-num {
+  background: var(--primary);
+  border-color: var(--primary);
+  color: white;
+}
+
+.workflow-step.done .workflow-step-num {
+  background: var(--primary-soft);
+  border-color: var(--primary);
+  color: var(--primary);
+}
+
+.workflow-step-label {
+  font-size: 0.68rem;
+  font-weight: 700;
+  line-height: 1.2;
+}
+
+.workflow-nav {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+  margin-top: 1rem;
+  padding-top: 1rem;
+  border-top: 1px solid #e8eeec;
+}
+
+.workflow-progress-text {
+  font-size: 0.85rem;
+  text-align: center;
+  flex: 1;
+}
+
+.workflow-step-kicker {
+  color: var(--muted);
+  font-size: 0.88rem;
+  font-weight: 700;
+  margin: 0 0 0.75rem;
+}
+
+.workflow-intro h2 {
+  margin-top: 0;
+}
+
+.workflow-list {
+  margin: 0.5rem 0 0;
+  padding-left: 1.2rem;
+}
+
+.workflow-list li {
+  margin-bottom: 0.45rem;
+}
+
+.workflow-hint {
+  text-align: center;
+  font-size: 0.88rem;
+  margin: 0.5rem 0 0;
+}
+
+.workflow-path-banner {
+  margin-bottom: 0.75rem;
+}
+
+.workflow-step-card {
+  margin-bottom: 0;
+}

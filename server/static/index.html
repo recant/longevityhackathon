@@ -70,6 +70,30 @@
     .path-card span { font-size: 0.82rem; color: var(--muted); }
     .video-wrap { background: #1a2428; border-radius: var(--radius); overflow: hidden; margin: 0.75rem 0; aspect-ratio: 4/3; }
     .video-wrap video { width: 100%; height: 100%; object-fit: cover; }
+    .workflow-stepper { display: flex; gap: 0.35rem; overflow-x: auto; padding: 0.5rem 0 1rem; margin-bottom: 0.25rem; }
+    .workflow-step { flex: 1; min-width: 4.2rem; text-align: center; opacity: 0.5; font-size: 0.68rem; font-weight: 700; }
+    .workflow-step.active, .workflow-step.done { opacity: 1; }
+    .workflow-step-num {
+      width: 1.65rem; height: 1.65rem; margin: 0 auto 0.2rem; border-radius: 50%;
+      background: var(--card); border: 2px solid var(--secondary-soft);
+      display: flex; align-items: center; justify-content: center; font-size: 0.72rem;
+    }
+    .workflow-step.active .workflow-step-num { background: var(--primary); border-color: var(--primary); color: #fff; }
+    .workflow-step.done .workflow-step-num { background: var(--primary-soft); border-color: var(--primary); color: var(--primary); }
+    .workflow-banner {
+      background: var(--card); border-radius: var(--radius); padding: 0.75rem 1rem;
+      margin-bottom: 0.5rem; box-shadow: 0 4px 12px rgba(0,0,0,.05);
+    }
+    .workflow-kicker { color: var(--muted); font-size: 0.88rem; font-weight: 700; margin: 0 0 0.5rem; }
+    .workflow-nav {
+      display: flex; align-items: center; justify-content: space-between; gap: 0.5rem;
+      margin-top: 1rem; padding-top: 1rem; border-top: 1px solid #e8eeec;
+    }
+    .workflow-nav .hint { margin: 0; flex: 1; text-align: center; font-size: 0.85rem; }
+    .workflow-list { margin: 0.5rem 0 0; padding-left: 1.2rem; }
+    .workflow-list li { margin-bottom: 0.4rem; }
+    .workflow-hint { text-align: center; font-size: 0.88rem; color: var(--muted); margin: 0.5rem 0 0; }
+    #tabs { display: none; }
   </style>
 </head>
 <body>
@@ -91,17 +115,27 @@
     </div>
     <p class="hint" id="cvBackend"></p>
 
-    <nav id="tabs">
-      <button type="button" data-tab="profile" data-path="both" class="active">Profile</button>
-      <button type="button" data-tab="reaction" data-path="both">Reaction</button>
-      <button type="button" data-tab="walk" data-path="manual">Walk</button>
-      <button type="button" data-tab="chair" data-path="manual">Chair</button>
-      <button type="button" data-tab="cvWalk" data-path="vision">Video walk</button>
-      <button type="button" data-tab="cvChair" data-path="vision">Video chair</button>
-      <button type="button" data-tab="dash" data-path="both">Dashboard</button>
+    <div class="workflow-banner">
+      <strong id="workflowPathLabel">At-home tests</strong> guided check-in
+      <div class="btn-row" style="margin-top:0.5rem">
+        <button type="button" class="btn secondary" id="workflowRestart">Restart</button>
+      </div>
+    </div>
+    <div class="workflow-stepper" id="workflowStepper"></div>
+    <p class="workflow-kicker" id="workflowKicker"></p>
+
+    <nav id="tabs" aria-hidden="true">
+      <button type="button" data-tab="profile">Profile</button>
     </nav>
 
-    <section id="profile" class="show">
+    <section id="intro">
+      <h2 id="introTitle">At-home tests</h2>
+      <p class="hint" id="introLead">Step-by-step check-in — about 10 minutes together.</p>
+      <ol class="workflow-list" id="introList"></ol>
+      <p class="hint" id="introTip"></p>
+    </section>
+
+    <section id="profile">
       <h2>Parent profile</h2>
       <p class="hint">Used for age/sex norm comparison (Bohannon, Rikli, Woods).</p>
       <label>Name</label><input id="pName" />
@@ -179,10 +213,17 @@
     </section>
 
     <section id="dash">
-      <h2>Trajectory</h2>
-      <button type="button" class="btn" id="loadSnap">Refresh dashboard</button>
+      <h2>Your results</h2>
+      <button type="button" class="btn secondary" id="loadSnap">Refresh</button>
       <div id="dashOut"></div>
     </section>
+
+    <p class="workflow-hint" id="workflowUnlockHint" style="display:none">Complete this step to unlock Continue.</p>
+    <div class="workflow-nav">
+      <button type="button" class="btn secondary" id="wfBack">Back</button>
+      <p class="hint" id="wfProgress">Step 1 of 6</p>
+      <button type="button" class="btn" id="wfContinue">Continue</button>
+    </div>
   </div>
 
   <script>
@@ -204,40 +245,170 @@
       el.textContent = typeof data === "string" ? data : JSON.stringify(data, null, 2);
     }
 
-    // Assessment path
+    // Guided workflow (two paths)
+    const MANUAL_WORKFLOW = [
+      { id: "intro", section: "intro", title: "Welcome", subtitle: "At-home tests — about 10 minutes" },
+      { id: "profile", section: "profile", title: "Profile", subtitle: "Age & sex for fair comparisons" },
+      { id: "reaction", section: "reaction", title: "Reaction", subtitle: "Tap when green (5 trials)" },
+      { id: "walk", section: "walk", title: "Walk", subtitle: "10-foot timed walk" },
+      { id: "chair", section: "chair", title: "Chair", subtitle: "30-second stand count" },
+      { id: "results", section: "dash", title: "Results", subtitle: "Trajectory & next steps" },
+    ];
+    const VISION_WORKFLOW = [
+      { id: "intro", section: "intro", title: "Welcome", subtitle: "Video analysis — two short clips" },
+      { id: "profile", section: "profile", title: "Profile", subtitle: "Age & sex for fair comparisons" },
+      { id: "cvWalk", section: "cvWalk", title: "Video walk", subtitle: "Gait from a walking clip" },
+      { id: "cvChair", section: "cvChair", title: "Video chair", subtitle: "Count stands from video" },
+      { id: "reaction", section: "reaction", title: "Reaction", subtitle: "Quick tap test (no video)" },
+      { id: "results", section: "dash", title: "Results", subtitle: "Trajectory & next steps" },
+    ];
+    const INTRO_COPY = {
+      manual: {
+        title: "At-home tests",
+        lead: "Step-by-step check-in — about 10 minutes together.",
+        steps: [
+          "Set up your parent's profile",
+          "Reaction — tap when the screen turns green",
+          "Walk — time a normal 10-foot walk",
+          "Chair stand — count stands in 30 seconds",
+          "See results, trends, and conversation tips",
+        ],
+        tip: "No video upload — just a hallway and a sturdy chair.",
+      },
+      vision: {
+        title: "Video analysis",
+        lead: "Film two short clips, then a quick tap test.",
+        steps: [
+          "Set up your parent's profile",
+          "Film a walking clip (side view, ~10–15 seconds)",
+          "Film chair stands for ~30 seconds",
+          "Reaction tap test together",
+          "Review trajectory and gentle recommendations",
+        ],
+        tip: "Good lighting, full body in frame, phone held steady.",
+      },
+    };
+
     let currentPath = localStorage.getItem("kinspan_path") || "manual";
     const pickManual = document.getElementById("pickManual");
     const pickVision = document.getElementById("pickVision");
+    const COMPLETED_KEY = "kinspan_completed";
+    const STEP_KEY = "kinspan_workflow_step";
 
-    function showTab(tabId) {
-      document.querySelectorAll("#tabs button").forEach((b) => {
-        b.classList.toggle("active", b.dataset.tab === tabId);
-      });
+    function getWorkflow() {
+      return currentPath === "vision" ? VISION_WORKFLOW : MANUAL_WORKFLOW;
+    }
+
+    function loadCompleted() {
+      try {
+        return new Set(JSON.parse(localStorage.getItem(COMPLETED_KEY) || "[]"));
+      } catch { return new Set(); }
+    }
+
+    let completed = loadCompleted();
+    let stepIndex = (() => {
+      const n = parseInt(localStorage.getItem(STEP_KEY) || "0", 10);
+      const steps = getWorkflow();
+      return Number.isFinite(n) && n >= 0 && n < steps.length ? n : 0;
+    })();
+
+    function saveCompleted() {
+      localStorage.setItem(COMPLETED_KEY, JSON.stringify([...completed]));
+    }
+
+    function syncWorkflowNav() {
+      const steps = getWorkflow();
+      const step = steps[stepIndex];
+      if (!step) return;
+      const unlock = document.getElementById("workflowUnlockHint");
+      const needsSave = step.id !== "intro" && step.id !== "results";
+      unlock.style.display = needsSave && !completed.has(step.id) ? "block" : "none";
+      const canContinue =
+        step.id === "intro" || step.id === "results" || completed.has(step.id);
+      document.getElementById("wfContinue").disabled = !canContinue;
+    }
+
+    function markComplete(id) {
+      completed.add(id);
+      saveCompleted();
+      renderWorkflowUI();
+      syncWorkflowNav();
+    }
+
+    function resetWorkflow() {
+      completed = new Set();
+      localStorage.removeItem(COMPLETED_KEY);
+      stepIndex = 0;
+      localStorage.setItem(STEP_KEY, "0");
+      renderWorkflowUI();
+      showWorkflowStep();
+    }
+
+    function showWorkflowStep() {
+      const steps = getWorkflow();
+      const step = steps[stepIndex];
       document.querySelectorAll("section").forEach((s) => s.classList.remove("show"));
-      const el = document.getElementById(tabId);
+      const el = document.getElementById(step.section);
       if (el) el.classList.add("show");
-      if (tabId === "dash") loadDashboard();
+      document.getElementById("workflowKicker").textContent = step.subtitle;
+      document.getElementById("wfProgress").textContent = "Step " + (stepIndex + 1) + " of " + steps.length;
+      document.getElementById("wfBack").disabled = stepIndex === 0;
+      document.getElementById("wfContinue").textContent = stepIndex >= steps.length - 1 ? "Finish" : "Continue";
+      syncWorkflowNav();
+      if (step.section === "dash") loadDashboard();
+      if (step.section === "intro") renderIntro();
+      localStorage.setItem(STEP_KEY, String(stepIndex));
+      renderWorkflowUI();
+    }
+
+    function renderIntro() {
+      const copy = INTRO_COPY[currentPath];
+      document.getElementById("introTitle").textContent = copy.title;
+      document.getElementById("introLead").textContent = copy.lead;
+      document.getElementById("introTip").textContent = copy.tip;
+      document.getElementById("introList").innerHTML = copy.steps.map((s) => "<li>" + s + "</li>").join("");
+    }
+
+    function renderWorkflowUI() {
+      const steps = getWorkflow();
+      document.getElementById("workflowPathLabel").textContent =
+        currentPath === "manual" ? "At-home tests" : "Video analysis";
+      document.getElementById("workflowStepper").innerHTML = steps.map((s, i) => {
+        const cls = ["workflow-step"];
+        if (i === stepIndex) cls.push("active");
+        else if (completed.has(s.id) || i < stepIndex) cls.push("done");
+        const mark = completed.has(s.id) && i !== stepIndex ? "✓" : (i + 1);
+        return "<div class=\"" + cls.join(" ") + "\"><div class=\"workflow-step-num\">" + mark +
+          "</div>" + s.title + "</div>";
+      }).join("");
     }
 
     function applyPath() {
       pickManual.classList.toggle("selected", currentPath === "manual");
       pickVision.classList.toggle("selected", currentPath === "vision");
-      document.querySelectorAll("#tabs button").forEach((btn) => {
-        const p = btn.dataset.path || "both";
-        const show = p === "both" || p === currentPath;
-        btn.style.display = show ? "inline-block" : "none";
-      });
-      const active = document.querySelector("#tabs button.active");
-      if (active && active.style.display === "none") showTab("profile");
       localStorage.setItem("kinspan_path", currentPath);
+      const steps = getWorkflow();
+      if (stepIndex >= steps.length) stepIndex = 0;
+      renderWorkflowUI();
+      showWorkflowStep();
     }
 
-    pickManual.onclick = () => { currentPath = "manual"; applyPath(); };
-    pickVision.onclick = () => { currentPath = "vision"; applyPath(); };
-
-    document.querySelectorAll("#tabs button").forEach((btn) => {
-      btn.addEventListener("click", () => showTab(btn.dataset.tab));
-    });
+    pickManual.onclick = () => {
+      if (currentPath !== "manual") { currentPath = "manual"; resetWorkflow(); }
+      else applyPath();
+    };
+    pickVision.onclick = () => {
+      if (currentPath !== "vision") { currentPath = "vision"; resetWorkflow(); }
+      else applyPath();
+    };
+    document.getElementById("workflowRestart").onclick = resetWorkflow;
+    document.getElementById("wfBack").onclick = () => {
+      if (stepIndex > 0) { stepIndex--; showWorkflowStep(); }
+    };
+    document.getElementById("wfContinue").onclick = () => {
+      const steps = getWorkflow();
+      if (stepIndex < steps.length - 1) { stepIndex++; showWorkflowStep(); }
+    };
     applyPath();
 
     // Health
@@ -276,6 +447,7 @@
         const res = await api("/api/assessments/cv/walk", { method: "POST", body: form });
         showResult(out, res.scores.label + ": " + res.scores.score + "/100\n" + res.scores.interpretation +
           "\n\nCV metrics:\n" + JSON.stringify(res.cv, null, 2));
+        markComplete("cvWalk");
       } catch (e) { showResult(out, e.message); }
     };
 
@@ -291,6 +463,7 @@
         const res = await api("/api/assessments/cv/chair-stand", { method: "POST", body: form });
         showResult(out, res.scores.label + ": " + res.scores.score + "/100\n" + res.scores.interpretation +
           "\n\nCV metrics:\n" + JSON.stringify(res.cv, null, 2));
+        markComplete("cvChair");
       } catch (e) { showResult(out, e.message); }
     };
 
@@ -301,6 +474,7 @@
         document.getElementById("pName").value = p.display_name || "";
         document.getElementById("pAge").value = p.age || 68;
         document.getElementById("pSex").value = (p.sex || "female").toLowerCase().includes("male") ? "male" : "female";
+        if (p.display_name && p.age) markComplete("profile");
       } catch (e) { console.warn(e); }
     }
     loadProfile();
@@ -316,6 +490,7 @@
           },
         });
         showResult(out, "Saved: " + p.display_name + ", age " + p.age);
+        markComplete("profile");
       } catch (e) { showResult(out, e.message); }
     };
 
@@ -394,6 +569,7 @@
       try {
         const res = await api("/api/assessments/reaction", { method: "POST", body: { trials_ms: reactTrials } });
         showResult(out, res.scores.label + ": " + res.scores.score + "/100\n" + res.scores.interpretation);
+        markComplete("reaction");
       } catch (e) { showResult(out, e.message); }
     };
 
@@ -488,6 +664,7 @@
         const res = await api("/api/assessments/gait", { method: "POST", body: { time_seconds: t } });
         showResult(out, res.scores.label + ": " + res.scores.score + "/100\n" + res.scores.interpretation +
           "\nSpeed: " + res.scores.raw.speed_mps + " m/s");
+        markComplete("walk");
       } catch (e) { showResult(out, e.message); }
     };
 
@@ -519,6 +696,7 @@
       try {
         const res = await api("/api/assessments/chair-stand", { method: "POST", body: { reps: chairReps } });
         showResult(out, res.scores.label + ": " + res.scores.score + "/100\n" + res.scores.interpretation);
+        markComplete("chair");
       } catch (e) { showResult(out, e.message); }
     };
 

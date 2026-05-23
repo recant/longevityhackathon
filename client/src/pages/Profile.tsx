@@ -1,14 +1,18 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { getProfile, updateProfile, type Profile as ProfileType } from "../api";
 
-export default function Profile() {
+type Props = { embedded?: boolean; onSaved?: () => void };
+
+export default function Profile({ embedded, onSaved }: Props = {}) {
   const [form, setForm] = useState<Partial<ProfileType>>({});
   const [saved, setSaved] = useState(false);
   const [err, setErr] = useState<string | null>(null);
+  const onSavedRef = useRef(onSaved);
+  onSavedRef.current = onSaved;
 
   useEffect(() => {
     getProfile()
-      .then((p) =>
+      .then((p) => {
         setForm({
           display_name: p.display_name,
           age: p.age ?? 68,
@@ -17,10 +21,11 @@ export default function Profile() {
           medications: p.medications ?? "",
           smoking: p.smoking ?? "never",
           sleep_habits: p.sleep_habits ?? "",
-        })
-      )
+        });
+        if (embedded && p.display_name && p.age) onSavedRef.current?.();
+      })
       .catch((e) => setErr(e instanceof Error ? e.message : "Load failed"));
-  }, []);
+  }, [embedded]);
 
   const submit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -28,14 +33,16 @@ export default function Profile() {
     try {
       await updateProfile(form);
       setSaved(true);
+      onSaved?.();
       setTimeout(() => setSaved(false), 2500);
     } catch (ex) {
       setErr(ex instanceof Error ? ex.message : "Save failed");
     }
   };
 
+  const Tag = embedded ? "div" : "section";
   return (
-    <section className="card">
+    <Tag className={embedded ? "" : "card"}>
       <h2>Parent profile</h2>
       <p className="muted">
         Scores are adjusted for age and sex — this helps compare to typical patterns, not to
@@ -99,6 +106,6 @@ export default function Profile() {
       </form>
       {saved && <p className="success-msg">Saved.</p>}
       {err && <p className="error">{err}</p>}
-    </section>
+    </Tag>
   );
 }

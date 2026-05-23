@@ -48,7 +48,7 @@ function CategoryCard({ cat }: { cat: CategoryScore }) {
   );
 }
 
-export default function Dashboard() {
+export default function Dashboard({ embedded }: { embedded?: boolean } = {}) {
   const [snap, setSnap] = useState<Snapshot | null>(null);
   const [err, setErr] = useState<string | null>(null);
 
@@ -70,6 +70,7 @@ export default function Dashboard() {
 
   return (
     <>
+      {embedded && <h2>Your results</h2>}
       <section className="snapshot-hero">
         <div className="muted" style={{ fontWeight: 700 }}>
           Aging trajectory
@@ -107,7 +108,7 @@ export default function Dashboard() {
         categories.map((c) => <CategoryCard key={c.category} cat={c} />)
       ) : (
         <section className="card">
-          <p className="muted">No scored check-ins yet. Start from Check-ins.</p>
+          <p className="muted">No scored check-ins yet. Complete the guided workflow steps above.</p>
         </section>
       )}
 

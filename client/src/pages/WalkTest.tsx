@@ -4,7 +4,9 @@ import { saveGait, type CategoryScore } from "../api";
 
 type WalkState = "idle" | "running" | "paused" | "stopped";
 
-export default function WalkTest() {
+type Props = { embedded?: boolean; onSaved?: () => void };
+
+export default function WalkTest({ embedded, onSaved }: Props = {}) {
   const [walkState, setWalkState] = useState<WalkState>("idle");
   const [displaySec, setDisplaySec] = useState<number | null>(null);
   const [elapsed, setElapsed] = useState<number | null>(null);
@@ -84,6 +86,7 @@ export default function WalkTest() {
     try {
       const res = await saveGait(t);
       setScores(res.scores);
+      onSaved?.();
     } catch (e) {
       alert(e instanceof Error ? e.message : "Save failed");
     } finally {
@@ -98,8 +101,9 @@ export default function WalkTest() {
         ? (3.048 / parseFloat(manual)).toFixed(2)
         : null;
 
+  const Tag = embedded ? "div" : "section";
   return (
-    <section className="card">
+    <Tag className={embedded ? "" : "card"}>
       <h2>Mobility — 10-foot walk</h2>
       <p className="muted">
         Mark 10 feet on the floor (3.05 m). Parent walks at a <strong>comfortable</strong> pace; time
@@ -155,11 +159,13 @@ export default function WalkTest() {
             Speed: {(scores.raw as { speed_mps: number }).speed_mps} m/s · Functional age:{" "}
             {scores.functional_age}
           </p>
-          <Link className="btn secondary" to="/dashboard">
-            View trajectory
-          </Link>
+          {!embedded && (
+            <Link className="btn secondary" to="/dashboard">
+              View trajectory
+            </Link>
+          )}
         </div>
       )}
-    </section>
+    </Tag>
   );
 }

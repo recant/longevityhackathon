@@ -1,9 +1,11 @@
 import { Link } from "react-router-dom";
 import { useEffect, useState } from "react";
 import { getProfile, getSnapshot, type Snapshot } from "../api";
-import type { AssessmentPath } from "../path";
+import { getPath, setPath, type AssessmentPath } from "../path";
+import { resetWorkflowProgress } from "../workflow";
 
-export default function Home({ path }: { path: AssessmentPath }) {
+export default function Home() {
+  const [path, setPathState] = useState<AssessmentPath>(getPath());
   const [name, setName] = useState("your parent");
   const [snap, setSnap] = useState<Snapshot | null>(null);
   const [err, setErr] = useState<string | null>(null);
@@ -17,95 +19,75 @@ export default function Home({ path }: { path: AssessmentPath }) {
       .catch((e) => setErr(e instanceof Error ? e.message : "Server not running"));
   }, []);
 
-  const done =
-    (snap?.history_counts.reactions ?? 0) > 0 &&
-    (snap?.history_counts.gaits ?? 0) > 0 &&
-    (snap?.history_counts.chairs ?? 0) > 0;
+  const pickPath = (p: AssessmentPath) => {
+    setPath(p);
+    setPathState(p);
+    resetWorkflowProgress();
+  };
 
   return (
     <>
       <section className="card">
         <h2>For adult children who care</h2>
         <p className="muted">
-          You notice {name} walking slower, forgetting things, or tiring easily — but it is hard
-          to know what is normal aging versus what deserves attention, especially when they
-          distrust doctors.
-        </p>
-        <p className="muted">
-          KinSpan turns three cheap, respected home observations into plain-language trajectory
-          insights and gentle next steps.
+          Track {name}&apos;s functional aging with a calm, step-by-step guided check-in — choose
+          how you want to measure movement.
         </p>
         {err && <p className="error">Start the API on port 8000. ({err})</p>}
       </section>
 
-      <section className="snapshot-hero">
-        <div className="muted" style={{ fontWeight: 700 }}>
-          Today&apos;s functional health snapshot
-        </div>
-        {snap?.overall.overall_score != null ? (
-          <>
-            <div className="score-big">{snap.overall.overall_score}</div>
-            <p style={{ margin: "0.25rem 0 0" }}>{snap.overall.headline}</p>
-            <div className="ages">
-              <span>Actual age: {snap.overall.chronological_age}</span>
-              <span>
-                Functional age estimate: {snap.overall.overall_functional_age ?? "—"}
-              </span>
-            </div>
-          </>
-        ) : (
-          <p style={{ marginTop: "0.75rem" }}>
-            Complete the three mini check-ins to unlock your first snapshot.
-          </p>
-        )}
-      </section>
-
       <section className="card">
-        <h2>{path === "manual" ? "At-home tests" : "Video + reaction path"}</h2>
-        <div className="activity-grid">
-          {path === "manual" ? (
-            <>
-              <Link className="activity-tile" to="/assess/reaction">
-                <h3>🧠 Cognitive Speed</h3>
-                <p className="muted">Reaction time — tap test</p>
-              </Link>
-              <Link className="activity-tile" to="/assess/walk">
-                <h3>🚶 Mobility</h3>
-                <p className="muted">10-foot walk — stopwatch</p>
-              </Link>
-              <Link className="activity-tile" to="/assess/chair">
-                <h3>🪑 Strength & Stability</h3>
-                <p className="muted">30-second chair stand</p>
-              </Link>
-            </>
-          ) : (
-            <>
-              <Link className="activity-tile" to="/assess/video-walk">
-                <h3>🚶 Video gait</h3>
-                <p className="muted">Speed, cadence, symmetry from video</p>
-              </Link>
-              <Link className="activity-tile" to="/assess/video-chair">
-                <h3>🪑 Video chair stand</h3>
-                <p className="muted">Rep count from video</p>
-              </Link>
-              <Link className="activity-tile" to="/assess/reaction">
-                <h3>🧠 Reaction (manual)</h3>
-                <p className="muted">Tap test — no video</p>
-              </Link>
-            </>
-          )}
+        <h2>Choose your path</h2>
+        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "0.75rem" }}>
+          <button
+            type="button"
+            className="activity-tile"
+            style={{
+              border: path === "manual" ? "2px solid var(--primary)" : "2px solid transparent",
+              cursor: "pointer",
+              textAlign: "left",
+              width: "100%",
+              background: path === "manual" ? "var(--primary-soft)" : undefined,
+            }}
+            onClick={() => pickPath("manual")}
+          >
+            <h3>At-home tests</h3>
+            <p className="muted">Stopwatch, tap reaction, chair counter</p>
+          </button>
+          <button
+            type="button"
+            className="activity-tile"
+            style={{
+              border: path === "vision" ? "2px solid var(--primary)" : "2px solid transparent",
+              cursor: "pointer",
+              textAlign: "left",
+              width: "100%",
+              background: path === "vision" ? "var(--primary-soft)" : undefined,
+            }}
+            onClick={() => pickPath("vision")}
+          >
+            <h3>Video analysis</h3>
+            <p className="muted">Computer vision for walk &amp; chair</p>
+          </button>
         </div>
-        {!done && (
-          <p className="muted" style={{ marginTop: "0.75rem" }}>
-            Progress: {snap?.history_counts.reactions ?? 0}/1 reaction ·{" "}
-            {snap?.history_counts.gaits ?? 0}/1 walk · {snap?.history_counts.chairs ?? 0}/1 chair
-          </p>
-        )}
       </section>
 
-      <Link className="btn block" to={done ? "/dashboard" : "/assess"}>
-        {done ? "View aging trajectory" : "Start check-ins"}
+      {snap?.overall.overall_score != null && (
+        <section className="snapshot-hero">
+          <div className="muted" style={{ fontWeight: 700 }}>
+            Last snapshot
+          </div>
+          <div className="score-big">{snap.overall.overall_score}</div>
+          <p style={{ margin: "0.25rem 0 0" }}>{snap.overall.headline}</p>
+        </section>
+      )}
+
+      <Link className="btn block" to="/guided">
+        Start guided check-in
       </Link>
+      <p className="muted" style={{ textAlign: "center", marginTop: "0.75rem" }}>
+        Step-by-step workflow for {path === "manual" ? "3 at-home tests" : "2 videos + reaction"}
+      </p>
     </>
   );
 }
