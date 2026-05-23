@@ -137,6 +137,7 @@ def score_reaction(median_ms: float, age: int) -> dict[str, Any]:
         "band": band,
         "interpretation": line,
         "functional_age": functional_age,
+        "assessment_mode": "manual",
         "raw": {"median_ms": median_ms, "expected_ms": round(expected)},
         "evidence": ["Woods et al., Front Psychol 2015", "Rosado-Antón et al., BMC Public Health 2021"],
         "emoji": "brain",
@@ -177,6 +178,37 @@ def _studenski_pace_note(speed: float) -> str:
     )
 
 
+def score_gait_from_cv(cv: dict[str, Any], age: int, sex: str | None = None) -> dict[str, Any]:
+    """Map computer-vision gait metrics to standard Mobility category score."""
+    scores = score_gait(float(cv["time_seconds"]), age, sex)
+    sym = float(cv.get("symmetry_index", 0.65))
+    stead = float(cv.get("steadiness_index", 0.65))
+    cv_bonus = (sym + stead) / 2 * 8
+    scores["score"] = round(min(100, scores["score"] + cv_bonus), 1)
+    scores["assessment_mode"] = "computer_vision"
+    scores["interpretation"] = (
+        scores["interpretation"]
+        + f" CV: ~{cv['speed_mps']} m/s, ~{cv.get('cadence_steps_per_min', '?')} steps/min, "
+        f"symmetry {sym:.0%} ({cv.get('method', 'opencv')})."
+    )
+    scores["raw"] = {**scores["raw"], "cv": cv}
+    scores["evidence"] = list(scores.get("evidence", [])) + ["Computer vision gait analysis"]
+    return scores
+
+
+def score_chair_from_cv(cv: dict[str, Any], age: int, sex: str | None = None) -> dict[str, Any]:
+    reps = int(cv.get("reps_30s_est", 0))
+    scores = score_chair_stand(reps, age, sex)
+    scores["assessment_mode"] = "computer_vision"
+    scores["interpretation"] = (
+        scores["interpretation"]
+        + f" Video analysis counted ~{reps} stands ({cv.get('method', 'opencv')})."
+    )
+    scores["raw"] = {**scores["raw"], "cv": cv}
+    scores["evidence"] = list(scores.get("evidence", [])) + ["Computer vision movement analysis"]
+    return scores
+
+
 def score_gait(time_seconds: float, age: int, sex: str | None = None) -> dict[str, Any]:
     speed = gait_speed_mps(time_seconds)
     expected = expected_gait_mps(age, sex)
@@ -199,6 +231,7 @@ def score_gait(time_seconds: float, age: int, sex: str | None = None) -> dict[st
         "band": band,
         "interpretation": pace_note,
         "functional_age": functional_age,
+        "assessment_mode": "manual",
         "raw": {
             "time_seconds": round(time_seconds, 2),
             "speed_mps": round(speed, 3),
@@ -252,6 +285,7 @@ def score_chair_stand(reps: int, age: int, sex: str | None = None) -> dict[str, 
         "band": band,
         "interpretation": line,
         "functional_age": functional_age,
+        "assessment_mode": "manual",
         "raw": {"reps_30s": reps, "expected_reps": round(expected, 1)},
         "evidence": [
             "CDC STEADI 30-second Chair Stand",

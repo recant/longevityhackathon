@@ -2,28 +2,41 @@
 
 from __future__ import annotations
 
+import shutil
+import uuid
+from pathlib import Path
 from typing import Any
 
-from pathlib import Path
-
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI, File, Form, HTTPException, UploadFile
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse
 from pydantic import BaseModel, Field
 
-STATIC_DIR = Path(__file__).parent / "static"
-
-from database import get_default_profile, init_db, list_all_sessions, save_chair, save_gait, save_reaction, update_profile
+from cv_analysis import analyze_chair_video, analyze_walk_video
+from database import (
+    DATA_DIR,
+    get_default_profile,
+    init_db,
+    list_all_sessions,
+    save_chair,
+    save_gait,
+    save_reaction,
+    update_profile,
+)
 from insights import generate_insights
 from scoring import (
     TRACKING_CHECKLIST,
     compute_trend,
     default_actions,
     overall_snapshot,
+    score_chair_from_cv,
     score_chair_stand,
     score_gait,
+    score_gait_from_cv,
     score_reaction,
 )
+
+STATIC_DIR = Path(__file__).parent / "static"
 
 app = FastAPI(title="KinSpan API", version="0.2.0", description="Longevity translator for families")
 
@@ -126,7 +139,33 @@ async def test_ui() -> FileResponse:
 
 @app.get("/api/health")
 async def health() -> dict[str, str]:
-    return {"status": "ok", "app": "kinspan", "ui": "/"}
+    try:
+        import mediapipe  # noqa: F401
+
+        cv_backend = "opencv+mediapipe"
+    except ImportError:
+        cv_backend = "opencv"
+    return {"status": "ok", "app": "kinspan", "ui": "/", "cv_backend": cv_backend}
+
+
+@app.get("/api/paths")
+async def assessment_paths() -> dict[str, Any]:
+    return {
+        "paths": [
+            {
+                "id": "manual",
+                "title": "At-home tests",
+                "description": "Stopwatch, tap reaction, chair counter — no video upload.",
+                "biomarkers": ["reaction", "gait", "chair"],
+            },
+            {
+                "id": "computer_vision",
+                "title": "Video analysis",
+                "description": "Film walking and chair rises; computer vision estimates speed, gait, and reps.",
+                "biomarkers": ["gait_video", "chair_video", "reaction_optional"],
+            },
+        ]
+    }
 
 
 @app.get("/api/profile")
@@ -185,6 +224,50 @@ async def snapshot() -> dict[str, Any]:
 async def history() -> dict:
     prof = await get_default_profile()
     return await list_all_sessions(prof["id"])
+
+
+def _save_upload(video: UploadFile) -> Path:
+    if not video.content_type or not video.content_type.startswith("video/"):
+        raise HTTPException(400, "Expected a video file")
+    ext = Path(video.filename or "clip.webm").suffix or ".webm"
+    dest = DATA_DIR / "videos" / f"{uuid.uuid4().hex}{ext}"
+    with dest.open("wb") as f:
+        shutil.copyfileobj(video.file, f)
+    return dest
+
+
+@app.post("/api/assessments/cv/walk")
+async def post_cv_walk(
+    video: UploadFile = File(...),
+    distance_meters: float = Form(3.048),
+) -> dict[str, Any]:
+    prof = await get_default_profile()
+    age, sex = _profile_age_sex(prof)
+    dest = _save_upload(video)
+    try:
+        cv = analyze_walk_video(dest, distance_meters=distance_meters)
+        scores = score_gait_from_cv(cv, age, sex)
+    except Exception as e:
+        dest.unlink(missing_ok=True)
+        raise HTTPException(500, f"Video analysis failed: {e}") from e
+    session = await save_gait(prof["id"], float(cv["time_seconds"]), scores)
+    return {"session": session, "scores": scores, "cv": cv}
+
+
+@app.post("/api/assessments/cv/chair-stand")
+async def post_cv_chair(video: UploadFile = File(...)) -> dict[str, Any]:
+    prof = await get_default_profile()
+    age, sex = _profile_age_sex(prof)
+    dest = _save_upload(video)
+    try:
+        cv = analyze_chair_video(dest)
+        reps = int(cv["reps_30s_est"])
+        scores = score_chair_from_cv(cv, age, sex)
+    except Exception as e:
+        dest.unlink(missing_ok=True)
+        raise HTTPException(500, f"Video analysis failed: {e}") from e
+    session = await save_chair(prof["id"], reps, scores)
+    return {"session": session, "scores": scores, "cv": cv}
 
 
 if __name__ == "__main__":

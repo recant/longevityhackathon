@@ -34,8 +34,19 @@ async def _migrate_profiles(db: aiosqlite.Connection) -> None:
             await db.execute(f"ALTER TABLE profiles ADD COLUMN {name} {typ}")
 
 
+async def _migrate_session_mode(db: aiosqlite.Connection) -> None:
+    for table in ("gait_sessions", "chair_sessions", "reaction_sessions"):
+        cur = await db.execute(f"PRAGMA table_info({table})")
+        cols = {row[1] for row in await cur.fetchall()}
+        if "assessment_mode" not in cols:
+            await db.execute(
+                f"ALTER TABLE {table} ADD COLUMN assessment_mode TEXT DEFAULT 'manual'"
+            )
+
+
 async def init_db() -> None:
     DATA_DIR.mkdir(parents=True, exist_ok=True)
+    (DATA_DIR / "videos").mkdir(exist_ok=True)
     async with aiosqlite.connect(DB_PATH) as db:
         await db.execute(
             """
@@ -87,6 +98,7 @@ async def init_db() -> None:
             )
             """
         )
+        await _migrate_session_mode(db)
         await db.commit()
         cur = await db.execute("SELECT COUNT(*) FROM profiles")
         row = await cur.fetchone()
@@ -156,15 +168,18 @@ async def save_gait(
     profile_id: int,
     time_seconds: float,
     scores: dict[str, Any],
+    *,
+    assessment_mode: str = "manual",
 ) -> dict[str, Any]:
     created = _utc_now()
+    mode = scores.get("assessment_mode", assessment_mode)
     async with aiosqlite.connect(DB_PATH) as db:
         cur = await db.execute(
             """
-            INSERT INTO gait_sessions (profile_id, time_seconds, scores_json, created_at)
-            VALUES (?, ?, ?, ?)
+            INSERT INTO gait_sessions (profile_id, time_seconds, scores_json, created_at, assessment_mode)
+            VALUES (?, ?, ?, ?, ?)
             """,
-            (profile_id, time_seconds, json.dumps(scores), created),
+            (profile_id, time_seconds, json.dumps(scores), created, mode),
         )
         await db.commit()
         sid = cur.lastrowid
@@ -175,15 +190,18 @@ async def save_chair(
     profile_id: int,
     reps: int,
     scores: dict[str, Any],
+    *,
+    assessment_mode: str = "manual",
 ) -> dict[str, Any]:
     created = _utc_now()
+    mode = scores.get("assessment_mode", assessment_mode)
     async with aiosqlite.connect(DB_PATH) as db:
         cur = await db.execute(
             """
-            INSERT INTO chair_sessions (profile_id, reps, scores_json, created_at)
-            VALUES (?, ?, ?, ?)
+            INSERT INTO chair_sessions (profile_id, reps, scores_json, created_at, assessment_mode)
+            VALUES (?, ?, ?, ?, ?)
             """,
-            (profile_id, reps, json.dumps(scores), created),
+            (profile_id, reps, json.dumps(scores), created, mode),
         )
         await db.commit()
         sid = cur.lastrowid

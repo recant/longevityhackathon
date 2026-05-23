@@ -60,6 +60,16 @@
     .err { color: var(--accent-warm); font-weight: 600; }
     .status { font-size: 0.8rem; color: var(--muted); margin-top: 0.5rem; }
     .btn-row { display: flex; flex-wrap: wrap; gap: 0.5rem; margin-top: 0.5rem; }
+    .path-cards { display: grid; grid-template-columns: 1fr 1fr; gap: 0.6rem; margin: 0.75rem 0; }
+    .path-card {
+      text-align: left; padding: 0.85rem; border: 2px solid transparent; border-radius: var(--radius);
+      background: var(--card); cursor: pointer; font-family: inherit; box-shadow: 0 4px 12px rgba(0,0,0,.05);
+    }
+    .path-card.selected { border-color: var(--primary); background: var(--primary-soft); }
+    .path-card strong { display: block; margin-bottom: 0.25rem; }
+    .path-card span { font-size: 0.82rem; color: var(--muted); }
+    .video-wrap { background: #1a2428; border-radius: var(--radius); overflow: hidden; margin: 0.75rem 0; aspect-ratio: 4/3; }
+    .video-wrap video { width: 100%; height: 100%; object-fit: cover; }
   </style>
 </head>
 <body>
@@ -68,12 +78,27 @@
     <p class="tag">Basic test UI · <span id="apiStatus">checking API…</span></p>
     <div class="notice">Wellness trends only — not medical diagnosis. One server: <code>uvicorn main:app --port 8000</code></div>
 
+    <h2 style="font-size:1rem;margin:0.75rem 0 0.35rem">Choose assessment path</h2>
+    <div class="path-cards">
+      <button type="button" class="path-card selected" id="pickManual">
+        <strong>At-home tests</strong>
+        <span>Timer, tap reaction, chair counter — no video.</span>
+      </button>
+      <button type="button" class="path-card" id="pickVision">
+        <strong>Video analysis</strong>
+        <span>Computer vision for walk &amp; chair — optional tap test.</span>
+      </button>
+    </div>
+    <p class="hint" id="cvBackend"></p>
+
     <nav id="tabs">
-      <button type="button" data-tab="profile" class="active">Profile</button>
-      <button type="button" data-tab="reaction">Reaction</button>
-      <button type="button" data-tab="walk">Walk</button>
-      <button type="button" data-tab="chair">Chair</button>
-      <button type="button" data-tab="dash">Dashboard</button>
+      <button type="button" data-tab="profile" data-path="both" class="active">Profile</button>
+      <button type="button" data-tab="reaction" data-path="both">Reaction</button>
+      <button type="button" data-tab="walk" data-path="manual">Walk</button>
+      <button type="button" data-tab="chair" data-path="manual">Chair</button>
+      <button type="button" data-tab="cvWalk" data-path="vision">Video walk</button>
+      <button type="button" data-tab="cvChair" data-path="vision">Video chair</button>
+      <button type="button" data-tab="dash" data-path="both">Dashboard</button>
     </nav>
 
     <section id="profile" class="show">
@@ -127,6 +152,32 @@
       <div id="chairOut" class="result" style="display:none"></div>
     </section>
 
+    <section id="cvWalk">
+      <h2>Video — walking gait</h2>
+      <p class="hint">Film 10–15s side or diagonal view. CV estimates speed, cadence, symmetry. Mark 10 ft on floor.</p>
+      <label>Walk distance (meters)</label>
+      <input id="cvWalkDist" type="number" step="0.1" value="3.048" />
+      <div class="video-wrap"><video id="cvWalkPreview" playsinline muted></video></div>
+      <div class="btn-row">
+        <button type="button" class="btn secondary" id="cvWalkCam">Record / pick video</button>
+        <input type="file" id="cvWalkFile" accept="video/*" capture="environment" style="display:none" />
+        <button type="button" class="btn" id="cvWalkUpload" disabled>Analyze walk</button>
+      </div>
+      <div id="cvWalkOut" class="result" style="display:none"></div>
+    </section>
+
+    <section id="cvChair">
+      <h2>Video — chair stand</h2>
+      <p class="hint">Film 30s of sit-to-stand reps. CV counts stands from body motion.</p>
+      <div class="video-wrap"><video id="cvChairPreview" playsinline muted></video></div>
+      <div class="btn-row">
+        <button type="button" class="btn secondary" id="cvChairCam">Record / pick video</button>
+        <input type="file" id="cvChairFile" accept="video/*" capture="environment" style="display:none" />
+        <button type="button" class="btn" id="cvChairUpload" disabled>Analyze chair</button>
+      </div>
+      <div id="cvChairOut" class="result" style="display:none"></div>
+    </section>
+
     <section id="dash">
       <h2>Trajectory</h2>
       <button type="button" class="btn" id="loadSnap">Refresh dashboard</button>
@@ -153,23 +204,95 @@
       el.textContent = typeof data === "string" ? data : JSON.stringify(data, null, 2);
     }
 
-    // Tabs
-    document.querySelectorAll("#tabs button").forEach((btn) => {
-      btn.addEventListener("click", () => {
-        document.querySelectorAll("#tabs button").forEach((b) => b.classList.remove("active"));
-        document.querySelectorAll("section").forEach((s) => s.classList.remove("show"));
-        btn.classList.add("active");
-        document.getElementById(btn.dataset.tab).classList.add("show");
-        if (btn.dataset.tab === "dash") loadDashboard();
+    // Assessment path
+    let currentPath = localStorage.getItem("kinspan_path") || "manual";
+    const pickManual = document.getElementById("pickManual");
+    const pickVision = document.getElementById("pickVision");
+
+    function showTab(tabId) {
+      document.querySelectorAll("#tabs button").forEach((b) => {
+        b.classList.toggle("active", b.dataset.tab === tabId);
       });
+      document.querySelectorAll("section").forEach((s) => s.classList.remove("show"));
+      const el = document.getElementById(tabId);
+      if (el) el.classList.add("show");
+      if (tabId === "dash") loadDashboard();
+    }
+
+    function applyPath() {
+      pickManual.classList.toggle("selected", currentPath === "manual");
+      pickVision.classList.toggle("selected", currentPath === "vision");
+      document.querySelectorAll("#tabs button").forEach((btn) => {
+        const p = btn.dataset.path || "both";
+        const show = p === "both" || p === currentPath;
+        btn.style.display = show ? "inline-block" : "none";
+      });
+      const active = document.querySelector("#tabs button.active");
+      if (active && active.style.display === "none") showTab("profile");
+      localStorage.setItem("kinspan_path", currentPath);
+    }
+
+    pickManual.onclick = () => { currentPath = "manual"; applyPath(); };
+    pickVision.onclick = () => { currentPath = "vision"; applyPath(); };
+
+    document.querySelectorAll("#tabs button").forEach((btn) => {
+      btn.addEventListener("click", () => showTab(btn.dataset.tab));
     });
+    applyPath();
 
     // Health
     api("/api/health").then((d) => {
       document.getElementById("apiStatus").textContent = "API OK · " + d.app;
+      document.getElementById("cvBackend").textContent =
+        "CV engine: " + (d.cv_backend || "opencv") + (d.cv_backend?.includes("mediapipe") ? "" : " — pip install mediapipe for better pose tracking");
     }).catch((e) => {
       document.getElementById("apiStatus").innerHTML = '<span class="err">API offline</span>';
     });
+
+    // CV video helpers
+    function wireVideo(fileInput, preview, uploadBtn) {
+      fileInput.onchange = () => {
+        const f = fileInput.files[0];
+        if (!f) return;
+        preview.src = URL.createObjectURL(f);
+        uploadBtn.disabled = false;
+      };
+    }
+    wireVideo(document.getElementById("cvWalkFile"), document.getElementById("cvWalkPreview"), document.getElementById("cvWalkUpload"));
+    wireVideo(document.getElementById("cvChairFile"), document.getElementById("cvChairPreview"), document.getElementById("cvChairUpload"));
+    document.getElementById("cvWalkCam").onclick = () => document.getElementById("cvWalkFile").click();
+    document.getElementById("cvChairCam").onclick = () => document.getElementById("cvChairFile").click();
+
+    document.getElementById("cvWalkUpload").onclick = async () => {
+      const f = document.getElementById("cvWalkFile").files[0];
+      const out = document.getElementById("cvWalkOut");
+      if (!f) return;
+      const form = new FormData();
+      form.append("video", f);
+      form.append("distance_meters", document.getElementById("cvWalkDist").value || "3.048");
+      out.style.display = "block";
+      out.textContent = "Analyzing…";
+      try {
+        const res = await api("/api/assessments/cv/walk", { method: "POST", body: form });
+        showResult(out, res.scores.label + ": " + res.scores.score + "/100\n" + res.scores.interpretation +
+          "\n\nCV metrics:\n" + JSON.stringify(res.cv, null, 2));
+      } catch (e) { showResult(out, e.message); }
+    };
+
+    document.getElementById("cvChairUpload").onclick = async () => {
+      const f = document.getElementById("cvChairFile").files[0];
+      const out = document.getElementById("cvChairOut");
+      if (!f) return;
+      const form = new FormData();
+      form.append("video", f);
+      out.style.display = "block";
+      out.textContent = "Analyzing…";
+      try {
+        const res = await api("/api/assessments/cv/chair-stand", { method: "POST", body: form });
+        showResult(out, res.scores.label + ": " + res.scores.score + "/100\n" + res.scores.interpretation +
+          "\n\nCV metrics:\n" + JSON.stringify(res.cv, null, 2));
+      } catch (e) { showResult(out, e.message); }
+    };
 
     // Profile
     async function loadProfile() {

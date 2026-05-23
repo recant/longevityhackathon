@@ -19,6 +19,7 @@ export type CategoryScore = {
   functional_age: number;
   raw: Record<string, unknown>;
   emoji: string;
+  assessment_mode?: string;
   evidence?: string[];
   latest_at?: string;
   trend_detail?: {

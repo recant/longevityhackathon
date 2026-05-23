@@ -6,3 +6,4 @@ opencv-python-headless>=4.10.0
 pillow>=10.4.0
 aiosqlite>=0.20.0
 pydantic>=2.9.0
+# Optional: pip install mediapipe  (improves pose tracking for video path)

@@ -344,3 +344,17 @@ label.field-label {
   padding: 1rem;
   margin-top: 1rem;
 }
+
+.video-wrap {
+  background: #1a2428;
+  border-radius: var(--radius);
+  overflow: hidden;
+  margin: 0.75rem 0;
+  aspect-ratio: 4/3;
+}
+
+.video-wrap video {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}

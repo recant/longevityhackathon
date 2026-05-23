@@ -34,6 +34,11 @@ function CategoryCard({ cat }: { cat: CategoryScore }) {
           {cat.trend_detail.summary}
         </span>
       )}
+      {cat.assessment_mode && (
+        <p className="muted" style={{ marginTop: "0.25rem", fontSize: "0.8rem" }}>
+          Source: {cat.assessment_mode === "computer_vision" ? "Video analysis" : "At-home test"}
+        </p>
+      )}
       {cat.evidence && cat.evidence.length > 0 && (
         <p className="muted" style={{ marginTop: "0.5rem", fontSize: "0.8rem" }}>
           Based on: {cat.evidence.join(" · ")}

@@ -76,6 +76,15 @@ uvicorn main:app --port 8000
 
 In another terminal: open http://127.0.0.1:8000/api/health — should return `{"status":"ok","app":"kinspan"}`.
 
+## Two assessment paths
+
+| Path | What it uses | Biomarkers |
+|------|----------------|------------|
+| **At-home tests** | Stopwatch, tap pad, chair counter | Reaction, 10-ft walk, 30s chair stand |
+| **Video analysis** | OpenCV (+ optional MediaPipe) on uploaded video | Walk gait (speed, cadence, symmetry), chair reps from video; reaction still manual |
+
+Choose your path at the top of the UI. For better pose tracking: `pip install -r requirements-cv.txt`
+
 ## Run locally (basic test UI — recommended)
 
 One command serves API + UI:

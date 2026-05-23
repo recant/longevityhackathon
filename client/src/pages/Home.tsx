@@ -1,8 +1,9 @@
 import { Link } from "react-router-dom";
 import { useEffect, useState } from "react";
 import { getProfile, getSnapshot, type Snapshot } from "../api";
+import type { AssessmentPath } from "../path";
 
-export default function Home() {
+export default function Home({ path }: { path: AssessmentPath }) {
   const [name, setName] = useState("your parent");
   const [snap, setSnap] = useState<Snapshot | null>(null);
   const [err, setErr] = useState<string | null>(null);
@@ -60,20 +61,39 @@ export default function Home() {
       </section>
 
       <section className="card">
-        <h2>Three biomarkers (MVP)</h2>
+        <h2>{path === "manual" ? "At-home tests" : "Video + reaction path"}</h2>
         <div className="activity-grid">
-          <Link className="activity-tile" to="/assess/reaction">
-            <h3>🧠 Cognitive Speed</h3>
-            <p className="muted">Reaction time — mental sharpness & responsiveness</p>
-          </Link>
-          <Link className="activity-tile" to="/assess/walk">
-            <h3>🚶 Mobility</h3>
-            <p className="muted">10-foot walk — movement health & independence</p>
-          </Link>
-          <Link className="activity-tile" to="/assess/chair">
-            <h3>🪑 Strength & Stability</h3>
-            <p className="muted">30-second chair stand — leg strength & fall resilience</p>
-          </Link>
+          {path === "manual" ? (
+            <>
+              <Link className="activity-tile" to="/assess/reaction">
+                <h3>🧠 Cognitive Speed</h3>
+                <p className="muted">Reaction time — tap test</p>
+              </Link>
+              <Link className="activity-tile" to="/assess/walk">
+                <h3>🚶 Mobility</h3>
+                <p className="muted">10-foot walk — stopwatch</p>
+              </Link>
+              <Link className="activity-tile" to="/assess/chair">
+                <h3>🪑 Strength & Stability</h3>
+                <p className="muted">30-second chair stand</p>
+              </Link>
+            </>
+          ) : (
+            <>
+              <Link className="activity-tile" to="/assess/video-walk">
+                <h3>🚶 Video gait</h3>
+                <p className="muted">Speed, cadence, symmetry from video</p>
+              </Link>
+              <Link className="activity-tile" to="/assess/video-chair">
+                <h3>🪑 Video chair stand</h3>
+                <p className="muted">Rep count from video</p>
+              </Link>
+              <Link className="activity-tile" to="/assess/reaction">
+                <h3>🧠 Reaction (manual)</h3>
+                <p className="muted">Tap test — no video</p>
+              </Link>
+            </>
+          )}
         </div>
         {!done && (
           <p className="muted" style={{ marginTop: "0.75rem" }}>
