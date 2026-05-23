@@ -1,0 +1,113 @@
+import tkinter as tk
+import random
+import time
+
+class HumanBenchmarkSimulator:
+    def __init__(self, root):
+        self.root = root
+        self.root.title("Reaction Time Test")
+        self.root.geometry("800x600")
+        
+        # Color palettes matching the original web app styles
+        self.color_red = "#ce2636"
+        self.color_green = "#4bdb6c"
+        self.color_blue = "#2b8bb8"
+        self.color_text = "#ffffff"
+        
+        # State tracking variables
+        self.current_state = "START"  # START, WAITING, CLICK, RESULT, FALSE_START
+        self.start_time = 0.0
+        self.scores = []
+        self.max_attempts = 5
+        self.delay_job = None
+        
+        # Main UI container panel
+        self.main_panel = tk.Frame(self.root, bg=self.color_blue)
+        self.main_panel.pack(fill=tk.BOTH, expand=True)
+        
+        # Label bindings for instructions and metrics
+        self.label_main = tk.Label(
+            self.main_panel, 
+            text="Reaction Time Test\n\nWhen the red box turns green, click as quickly as you can.\n\nClick anywhere to start.",
+            font=("Helvetica", 20, "bold"),
+            fg=self.color_text,
+            bg=self.color_blue,
+            justify="center"
+        )
+        self.label_main.pack(expand=True)
+        
+        # Bind mouse clicks globally across the interaction panel
+        self.main_panel.bind("<Button-1>", self.handle_click)
+        self.label_main.bind("<Button-1>", self.handle_click)
+
+    def handle_click(self, event):
+        if self.current_state == "START":
+            self.transition_to_waiting()
+            
+        elif self.current_state == "WAITING":
+            # False start logic (clicked while the screen was still red)
+            if self.delay_job:
+                self.root.after_cancel(self.delay_job)
+            self.transition_to_false_start()
+            
+        elif self.current_state == "CLICK":
+            # Valid reaction: capture precision timestamp immediately
+            end_time = time.perf_counter()
+            reaction_time_ms = int((end_time - self.start_time) * 1000)
+            self.scores.append(reaction_time_ms)
+            self.transition_to_result(reaction_time_ms)
+            
+        elif self.current_state in ["RESULT", "FALSE_START"]:
+            if len(self.scores) >= self.max_attempts:
+                self.display_final_report()
+            else:
+                self.transition_to_waiting()
+
+    def transition_to_waiting(self):
+        self.current_state = "WAITING"
+        self.main_panel.config(bg=self.color_red)
+        self.label_main.config(bg=self.color_red, text="Wait for green...")
+        
+        # Randomized wait interval between 2.0 and 5.0 seconds
+        random_delay_ms = random.randint(2000, 5000)
+        self.delay_job = self.root.after(random_delay_ms, self.trigger_green)
+
+    def trigger_green(self):
+        self.current_state = "CLICK"
+        self.main_panel.config(bg=self.color_green)
+        self.label_main.config(bg=self.color_green, text="CLICK!")
+        # High-precision performance counter initialization
+        self.start_time = time.perf_counter()
+
+    def transition_to_result(self, score):
+        self.current_state = "RESULT"
+        self.main_panel.config(bg=self.color_blue)
+        attempt_num = len(self.scores)
+        
+        msg = f"{score} ms\n\nAttempt {attempt_num} of {self.max_attempts}\n\nClick anywhere to keep going."
+        self.label_main.config(bg=self.color_blue, text=msg)
+
+    def transition_to_false_start(self):
+        self.current_state = "FALSE_START"
+        self.main_panel.config(bg=self.color_blue)
+        msg = "Too soon!\n\nClick anywhere to try this attempt again."
+        self.label_main.config(bg=self.color_blue, text=msg)
+
+    def display_final_report(self):
+        self.current_state = "START"
+        avg_score = int(sum(self.scores) / len(self.scores))
+        min_score = min(self.scores)
+        
+        msg = (
+            f"Test Complete!\n\n"
+            f"Average Score: {avg_score} ms\n"
+            f"Best Reaction: {min_score} ms\n\n"
+            f"Click anywhere to restart a new session."
+        )
+        self.label_main.config(text=msg)
+        self.scores.clear()  # Purge old session arrays
+
+if __name__ == "__main__":
+    app_window = tk.Tk()
+    engine = HumanBenchmarkSimulator(app_window)
+    app_window.mainloop()

@@ -1,0 +1,89 @@
+def evaluate_time_windows(self, current_timestamp: float):
+        """
+        Enforces a rolling 15-second tracking filter across the historical log stack
+        """
+        if not self.sample_buffer:
+            return
+            
+        # Find the oldest boundary sample that satisfies the 15-second window requirement
+        oldest_allowed_time = current_timestamp - 15.0
+        
+        # Extract all elements inside the 15.0 second bracket
+        active_window_samples = [s for s in self.sample_buffer if s.timestamp >= oldest_allowed_time]
+        
+        if not active_window_samples or (current_timestamp - active_window_samples[0].timestamp < 14.9):
+            return  # The buffer hasn't filled up to 15 seconds of width yet
+            
+        # Pipeline A: GPS Window Velocity Integration
+        gps_speeds = [s.gps_speed for s in active_window_samples]
+        avg_gps_speed_in_window = sum(gps_speeds) / len(gps_speeds)
+        
+        # Pipeline B: Dead Reckoning Window Velocity Estimation
+        avg_dr_speed_in_window = self.calculate_dead_reckoning_speed(active_window_samples, time_delta=15.0)
+        
+        # Signal arbitration: Prefer stable GPS speed if available
+        prioritized_speed = avg_gps_speed_in_window if avg_gps_speed_in_window > 0 else avg_dr_speed_in_window
+        
+        # Evaluate Peak Limits
+        if prioritized_speed > self.max_interval_speed:
+            self.max_interval_speed = prioritized_speed
+            print(f"[*] NEW MAX 15s PEAK VELOCITY: {self.max_interval_speed:.3f} m/s")
+
+        # Memory Cleanup: Drop entries older than 30 seconds to prevent heap bloat
+        if len(self.sample_buffer) > 5000:
+            self.sample_buffer = [s for s in self.sample_buffer if s.timestamp >= (current_timestamp - 30.0)]
+
+    def generate_session_report(self) -> Dict[str, Any]:
+        """
+        Compiles structural array statistics into an analytical dictionary profile
+        """
+        if self.start_time is None:
+            return {}
+            
+        total_duration = time.time() - self.start_time
+        if total_duration <= 0: total_duration = 1.0
+        
+        overall_avg_speed_gps = self.total_distance_gps / total_duration
+        
+        stride_len = self.user_height * 0.415
+        total_distance_dr = self.step_count * stride_len
+        overall_avg_speed_dr = total_distance_dr / total_duration
+        
+        return {
+            "session_duration_sec": round(total_duration, 2),
+            "total_steps_detected": self.step_count,
+            "gps_pipeline": {
+                "overall_avg_speed_mps": round(overall_avg_speed_gps, 3),
+                "total_calculated_distance_m": round(self.total_distance_gps, 2)
+            },
+            "dead_reckoning_pipeline": {
+                "overall_avg_speed_mps": round(overall_avg_speed_dr, 3),
+                "total_estimated_distance_m": round(total_distance_dr, 2)
+            },
+            "max_15s_window_speed_mps": round(self.max_interval_speed, 3)
+        }
+
+# MARK: - Execution / Testing Stub
+if __name__ == "__main__":
+    # Initialize Engine
+    engine = MotionDataPipeline(user_height_meters=1.80)
+    engine.start_capture_session()
+    
+    # Simulate data ingestion matching 15 seconds of walking at 100Hz
+    fake_time = 0.0
+    for i in range(1500): # 1500 iterations @ 0.01s = 15 seconds
+        fake_time += 0.01
+        # Create an artificial harmonic oscillation pattern on the Z axis to simulate footsteps
+        simulated_az = np.sin(2 * np.pi * 2.0 * fake_time) * 0.4  # 2.0 Hz stepping rate
+        simulated_gps_speed = 1.35 + np.random.normal(0, 0.05)   # Base speed + minor variance
+        
+        engine.process_hardware_stream(
+            timestamp=fake_time,
+            ax=0.01,
+            ay=0.02,
+            az=simulated_az,
+            gps_speed=simulated_gps_speed
+        )
+        
+    print("\n--- TEST ANALYSIS REPORT ---")
+    print(engine.generate_session_report())
