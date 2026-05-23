@@ -50,25 +50,35 @@
 | Early trend detection | % users with “watch closely” who re-test within 30 days | Preventive behavior |
 | Behavior adoption | Self-reported habit completion (future) | Outcomes |
 
+## Evidence base
+
+Full citations in [REFERENCES.md](./REFERENCES.md).
+
+| Biomarker | Norms / protocol | Interpretation / actions |
+|-----------|------------------|---------------------------|
+| Gait speed | Bohannon & Andrews, *Physiotherapy* 2011 | Studenski et al., *JAMA* 2011 survival bands (≥1.0, ≥0.8, ≥0.6 m/s) |
+| Chair stand | CDC STEADI + Rikli & Jones Senior Fitness Test | LIFE Study, *JAMA* 2014 for activity recommendations |
+| Reaction time | Woods et al., *Front Psychol* 2015 | Rosado-Antón et al., *BMC Public Health* 2021 for cognitive-motor habits |
+
 ## Scoring factors (what we actually measure)
 
 ### Cognitive Speed — reaction time
 
 - **Raw:** median milliseconds over 5 trials
-- **Derived:** score vs age-expected RT; functional cognitive age offset
+- **Derived:** score vs Woods et al. age-stratified simple RT norms
 - **Signals (plain language):** alertness, processing speed — *not* dementia screening
 
 ### Mobility — gait
 
 - **Raw:** seconds to walk 10 feet (3.048 m)
-- **Derived:** speed (m/s), score vs age/sex norm; functional mobility age
-- **Literature anchor:** gait speed is a strong longevity/frailty indicator; &lt;0.8 m/s often warrants attention (communicated gently)
+- **Derived:** speed (m/s), score vs Bohannon & Andrews comfortable gait norms
+- **Interpretation:** Studenski JAMA 2011 population bands in plain language
 
 ### Strength & Stability — chair stand
 
-- **Raw:** full stands in 30 seconds
-- **Derived:** score vs senior fitness norms; functional strength age
-- **Signals:** leg power, independence, fall resilience proxy
+- **Raw:** full stands in 30 seconds (CDC STEADI protocol)
+- **Derived:** score vs Rikli & Jones normative reps
+- **Actions:** LIFE Study–style structured walking when scores are low
 
 ### Overall
 

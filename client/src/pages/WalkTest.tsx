@@ -51,8 +51,9 @@ export default function WalkTest() {
     <section className="card">
       <h2>Mobility — 10-foot walk</h2>
       <p className="muted">
-        Mark 10 feet on the floor (about 3 large steps). Parent walks at a normal pace. Time from
-        first movement to crossing the line.
+        Mark 10 feet on the floor (3.05 m). Parent walks at a <strong>comfortable</strong> pace; time
+        from first movement to crossing the line. Scored against age/sex norms (Bohannon &amp;
+        Andrews, 2011); pace bands follow Studenski et al. (JAMA 2011).
       </p>
       <div className="timer-display">
         {running ? elapsed?.toFixed(2) ?? "0.00" : elapsed?.toFixed(2) ?? "—"}s

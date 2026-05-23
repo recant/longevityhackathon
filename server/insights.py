@@ -40,6 +40,12 @@ def generate_insights(profile: dict[str, Any], snapshot: dict[str, Any]) -> dict
 NEVER diagnose disease. NEVER use alarming red-flag medical language.
 Use warm, culturally sensitive phrasing for parents who may distrust medicine.
 
+Evidence base (mention only in plain language, no journal jargon overload):
+- Gait: Studenski JAMA 2011 (speed & survival), Bohannon Physiotherapy 2011 (norms)
+- Chair stand: CDC STEADI protocol, Rikli & Jones Senior Fitness Test norms
+- Reaction time: Woods Front Psychol 2015 (aging); Rosado-Antón BMC Public Health 2021 (training helps)
+- Activity advice: LIFE Study JAMA 2014 (structured walking/strength reduced mobility disability)
+
 Parent: {profile.get('display_name')}, age {profile.get('age', 'unknown')}.
 Snapshot JSON:
 {json.dumps(snapshot, indent=2)}

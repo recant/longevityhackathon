@@ -78,8 +78,8 @@ export default function ReactionTest() {
     <section className="card">
       <h2>Cognitive Speed</h2>
       <p className="muted">
-        Parent taps when the circle turns green. Encourage them — this is a mini activity, not an
-        exam.
+        Parent taps when the circle turns green (simple reaction time). Scored vs age norms from
+        Woods et al. (2015). A mini activity, not a dementia test.
       </p>
       <div
         className={`reaction-pad ${phase === "go" ? "go" : "waiting"}`}

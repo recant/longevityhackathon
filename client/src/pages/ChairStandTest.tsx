@@ -61,8 +61,9 @@ export default function ChairStandTest() {
     <section className="card">
       <h2>Strength & Stability — chair stand</h2>
       <p className="muted">
-        Use a sturdy chair without wheels. Count how many times they stand up fully in 30 seconds
-        — tap +1 each time. Stop if uncomfortable.
+        <strong>CDC STEADI 30-second chair stand:</strong> sturdy chair, arms crossed on chest if
+        safe (or hands on thighs). Count full stands in 30 seconds — tap +1 each time. Compared to
+        Rikli &amp; Jones Senior Fitness Test norms.
       </p>
       {phase === "idle" && (
         <button type="button" className="btn block" onClick={start}>

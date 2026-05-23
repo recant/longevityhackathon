@@ -24,7 +24,7 @@ Three respected biomarkers → three intuitive categories → trajectory dashboa
 
 ## Scoring philosophy
 
-Rule-based scores (0–100) compare results to **age/sex-adjusted norms**, then estimate a **functional age** per category (educational, not diagnostic). Trends use month-over-month score change with gentle language:
+Rule-based scores (0–100) compare results to **published age/sex norms** (see [REFERENCES.md](./REFERENCES.md)), then estimate a **functional age** per category (educational, not diagnostic). Trends use month-over-month score change with gentle language:
 
 - improving ↑
 - stable →
@@ -32,7 +32,15 @@ Rule-based scores (0–100) compare results to **age/sex-adjusted norms**, then 
 
 Optional `OPENAI_API_KEY` adds “explain like a caring family member” + conversation tips.
 
-See [HACKATHON.md](./HACKATHON.md) for pitch, demo script, and judge metrics.
+| Evidence | Citation |
+|----------|----------|
+| Gait & longevity | Studenski et al., JAMA 2011 |
+| Gait norms | Bohannon & Andrews, Physiotherapy 2011 |
+| Chair stand | CDC STEADI; Rikli & Jones Senior Fitness Test |
+| Reaction time | Woods et al., Front Psychol 2015 |
+| Interventions | LIFE Study, JAMA 2014; Rosado-Antón et al., BMC Public Health 2021 |
+
+See [HACKATHON.md](./HACKATHON.md) for pitch and [REFERENCES.md](./REFERENCES.md) for full bibliography.
 
 ## Run locally
 

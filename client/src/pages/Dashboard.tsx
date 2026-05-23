@@ -34,6 +34,11 @@ function CategoryCard({ cat }: { cat: CategoryScore }) {
           {cat.trend_detail.summary}
         </span>
       )}
+      {cat.evidence && cat.evidence.length > 0 && (
+        <p className="muted" style={{ marginTop: "0.5rem", fontSize: "0.8rem" }}>
+          Based on: {cat.evidence.join(" · ")}
+        </p>
+      )}
     </div>
   );
 }
@@ -103,7 +108,13 @@ export default function Dashboard() {
 
       <section className="card">
         <h2>Action plan</h2>
-        <p className="muted">Low-cost habits — framed as independence, not treatment.</p>
+        <p className="muted">
+          Low-cost habits — framed as independence, not treatment. See{" "}
+          <a href="https://github.com/recant/longevityhackathon/blob/main/REFERENCES.md" target="_blank" rel="noreferrer">
+            REFERENCES.md
+          </a>{" "}
+          for citations (LIFE Study, STEADI, etc.).
+        </p>
         <ul>
           {actions.map((a) => (
             <li key={a.title} style={{ marginBottom: "0.75rem" }}>
