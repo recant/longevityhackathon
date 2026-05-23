@@ -7,21 +7,30 @@
   <link href="https://fonts.googleapis.com/css2?family=Nunito:wght@400;600;700;800&display=swap" rel="stylesheet" />
   <style>
     :root {
-      --bg: #f6f3ed; --card: #fff; --text: #1e2d3d; --muted: #5f6f7f;
-      --accent: #3a7d6a; --soft: #e3f0eb; --amber: #faf3e6; --radius: 14px;
+      --primary: #7FA68C;
+      --secondary: #6E8FA3;
+      --bg: #F7F4EE;
+      --card: #FFFDFC;
+      --accent-warm: #C98B73;
+      --text: #2F3A3D;
+      --muted: #6B7478;
+      --primary-soft: #E8EFE9;
+      --secondary-soft: #E8EEF2;
+      --warm-soft: #F9F0EC;
+      --radius: 14px;
     }
     * { box-sizing: border-box; }
     body { margin: 0; font-family: Nunito, system-ui, sans-serif; background: var(--bg); color: var(--text); }
     .wrap { max-width: 640px; margin: 0 auto; padding: 1rem 1rem 2.5rem; }
     h1 { margin: 0; font-size: 1.6rem; }
     .tag { color: var(--muted); font-size: 0.9rem; }
-    .notice { background: var(--amber); border-left: 4px solid #c9923a; padding: 0.65rem 0.9rem; border-radius: 8px; font-size: 0.85rem; margin: 0.75rem 0; }
+    .notice { background: var(--warm-soft); border-left: 4px solid var(--accent-warm); padding: 0.65rem 0.9rem; border-radius: 8px; font-size: 0.85rem; margin: 0.75rem 0; color: var(--text); }
     nav { display: flex; flex-wrap: wrap; gap: 0.35rem; margin: 1rem 0; }
     nav button {
       border: none; background: var(--card); padding: 0.45rem 0.85rem; border-radius: 999px;
       font-family: inherit; font-weight: 700; cursor: pointer; box-shadow: 0 4px 12px rgba(0,0,0,.06);
     }
-    nav button.active { background: var(--accent); color: #fff; }
+    nav button.active { background: var(--primary); color: #fff; }
     section { display: none; background: var(--card); border-radius: var(--radius); padding: 1.1rem; box-shadow: 0 8px 24px rgba(0,0,0,.06); }
     section.show { display: block; }
     h2 { margin: 0 0 0.5rem; font-size: 1.15rem; }
@@ -33,22 +42,22 @@
     }
     .btn {
       display: inline-block; margin-top: 0.75rem; padding: 0.65rem 1.1rem; border: none; border-radius: 10px;
-      background: var(--accent); color: #fff; font-family: inherit; font-weight: 700; font-size: 1rem; cursor: pointer;
+      background: var(--primary); color: #fff; font-family: inherit; font-weight: 700; font-size: 1rem; cursor: pointer;
     }
-    .btn.secondary { background: var(--soft); color: var(--accent); }
+    .btn.secondary { background: var(--secondary-soft); color: var(--secondary); }
     .btn:disabled { opacity: 0.5; cursor: not-allowed; }
     .pad {
       min-height: 160px; border-radius: var(--radius); display: flex; align-items: center; justify-content: center;
       font-size: 1.25rem; font-weight: 800; cursor: pointer; margin: 0.75rem 0; user-select: none;
     }
-    .pad.wait { background: #e4ebe8; color: var(--muted); }
-    .pad.go { background: var(--accent); color: #fff; }
-    .big { font-size: 2.5rem; font-weight: 800; text-align: center; color: var(--accent); }
-    .result { background: var(--soft); border-radius: 10px; padding: 0.85rem; margin-top: 0.75rem; font-size: 0.92rem; }
-    .hero { background: linear-gradient(135deg, var(--soft), #e8f0fa); border-radius: var(--radius); padding: 1rem; margin-bottom: 0.75rem; }
-    .score-big { font-size: 2.2rem; font-weight: 800; color: var(--accent); }
-    .card-row { border-left: 4px solid var(--accent); padding: 0.65rem 0 0.65rem 0.75rem; margin: 0.5rem 0; background: #fafcfb; border-radius: 0 8px 8px 0; }
-    .err { color: #9a4a3a; font-weight: 600; }
+    .pad.wait { background: var(--primary-soft); color: var(--muted); }
+    .pad.go { background: var(--primary); color: #fff; }
+    .big { font-size: 2.5rem; font-weight: 800; text-align: center; color: var(--primary); }
+    .result { background: var(--primary-soft); border-radius: 10px; padding: 0.85rem; margin-top: 0.75rem; font-size: 0.92rem; }
+    .hero { background: linear-gradient(135deg, var(--primary-soft), var(--secondary-soft)); border-radius: var(--radius); padding: 1rem; margin-bottom: 0.75rem; }
+    .score-big { font-size: 2.2rem; font-weight: 800; color: var(--primary); }
+    .card-row { border-left: 4px solid var(--secondary); padding: 0.65rem 0 0.65rem 0.75rem; margin: 0.5rem 0; background: var(--primary-soft); border-radius: 0 8px 8px 0; }
+    .err { color: var(--accent-warm); font-weight: 600; }
     .status { font-size: 0.8rem; color: var(--muted); margin-top: 0.5rem; }
   </style>
 </head>
