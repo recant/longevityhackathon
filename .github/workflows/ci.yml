@@ -30,6 +30,9 @@ jobs:
       - name: Smoke test API import
         run: python -c "from main import app; assert app.title == 'KinSpan API'"
 
+      - name: Verify test UI exists
+        run: test -f static/index.html
+
   build-client:
     runs-on: ubuntu-latest
     defaults:

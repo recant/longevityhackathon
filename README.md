@@ -76,9 +76,9 @@ uvicorn main:app --port 8000
 
 In another terminal: open http://127.0.0.1:8000/api/health — should return `{"status":"ok","app":"kinspan"}`.
 
-## Run locally
+## Run locally (basic test UI — recommended)
 
-**Server**
+One command serves API + UI:
 
 ```powershell
 cd server
@@ -87,7 +87,9 @@ pip install -r requirements.txt
 uvicorn main:app --reload --port 8000
 ```
 
-**Client** (requires Node/npm)
+Open **http://localhost:8000** — built-in test UI for profile, all three biomarkers, and dashboard.
+
+## Run React client (optional)
 
 ```powershell
 cd client
@@ -95,7 +97,7 @@ npm install
 npm run dev
 ```
 
-Open http://localhost:5173
+Open http://localhost:5173 (proxies API to port 8000; keep server running).
 
 ## API (MVP)
 

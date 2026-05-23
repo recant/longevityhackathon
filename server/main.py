@@ -4,9 +4,14 @@ from __future__ import annotations
 
 from typing import Any
 
+from pathlib import Path
+
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import FileResponse
 from pydantic import BaseModel, Field
+
+STATIC_DIR = Path(__file__).parent / "static"
 
 from database import get_default_profile, init_db, list_all_sessions, save_chair, save_gait, save_reaction, update_profile
 from insights import generate_insights
@@ -113,9 +118,15 @@ def _build_snapshot(profile: dict[str, Any], history: dict[str, Any]) -> dict[st
     }
 
 
+@app.get("/")
+async def test_ui() -> FileResponse:
+    """Basic single-server test UI (no npm required)."""
+    return FileResponse(STATIC_DIR / "index.html")
+
+
 @app.get("/api/health")
 async def health() -> dict[str, str]:
-    return {"status": "ok", "app": "kinspan"}
+    return {"status": "ok", "app": "kinspan", "ui": "/"}
 
 
 @app.get("/api/profile")
