@@ -1,4 +1,8 @@
-# KinSpan
+# longevityhackathon — KinSpan
+
+**Control Group Longevity Hackathon** · [GitHub](https://github.com/recant/longevityhackathon)
+
+## KinSpan
 
 **Longevity translator for families** — a hackathon MVP that turns cheap, at-home observational biomarkers into plain-language aging trajectory insights for adult children worried about their parents.
 
@@ -64,13 +68,12 @@ Open http://localhost:5173
 ## Project layout
 
 ```
-parent-pace/
-  client/          React + Vite UI
-  server/
-    scoring.py     Rule-based functional aging scores
-    insights.py    Compassionate AI layer (optional)
-    database.py    SQLite
-    main.py        FastAPI
-  HACKATHON.md     Pitch & metrics
-  SAFETY.md        Disclaimers
+client/          React + Vite UI
+server/
+  scoring.py     Rule-based functional aging scores
+  insights.py    Compassionate AI layer (optional)
+  database.py    SQLite
+  main.py        FastAPI
+HACKATHON.md     Pitch & metrics
+SAFETY.md        Disclaimers
 ```
