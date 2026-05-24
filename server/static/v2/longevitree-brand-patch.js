@@ -1,15 +1,9 @@
 (function () {
-  const OLD_BRAND_PASCAL = ['K', 'in', 'Span'].join('');
-  const OLD_BRAND_LOWER = ['k', 'in', 'span'].join('');
-  const OLD_BRAND_UPPER = ['K', 'IN', 'SPAN'].join('');
   const BOOT_RESET_KEY = 'longevitree_boot_reset_done';
 
   function replaceBrandText(value) {
     return String(value || '')
       .split('LongeviTree').join('Longevitree')
-      .split(OLD_BRAND_PASCAL).join('Longevitree')
-      .split(OLD_BRAND_LOWER).join('longevitree')
-      .split(OLD_BRAND_UPPER).join('LONGEVITREE')
       .split('Quick Sit & Stand').join('Quick Stand')
       .split('Quick Sit &amp; Stand').join('Quick Stand')
       .split('Sit & Stand').join('Quick Stand')
@@ -21,28 +15,26 @@
       .split('CDC 30-second rep count').join('Quick Stand')
       .split('Single sit-to-stand timer').join('Single stand timer')
       .split("We'll start with the Quick Stand test. Grab a chair — it takes 90 seconds")
-      .join("We'll start with the Quick Stand test. Grab a chair — it takes under a minute");
+      .join("We'll start with the Reaction Time test. It takes under a minute and gives us a quick first signal.");
   }
 
   function clearOldBrowserMemory() {
     try {
-      const localKeys = [];
+      const removeKeys = [];
       for (let i = 0; i < localStorage.length; i += 1) {
         const key = localStorage.key(i);
-        if (key && (/kinspan/i.test(key) || /longevitree/i.test(key))) localKeys.push(key);
+        if (key && /longevitree/i.test(key)) removeKeys.push(key);
       }
-      localKeys.forEach((key) => localStorage.removeItem(key));
+      removeKeys.forEach((key) => localStorage.removeItem(key));
     } catch (_) {}
 
     try {
-      const sessionKeys = [];
+      const removeKeys = [];
       for (let i = 0; i < sessionStorage.length; i += 1) {
         const key = sessionStorage.key(i);
-        if (key && (/kinspan/i.test(key) || /longevitree/i.test(key))) sessionKeys.push(key);
+        if (key && /longevitree/i.test(key) && key !== BOOT_RESET_KEY) removeKeys.push(key);
       }
-      sessionKeys.forEach((key) => {
-        if (key !== BOOT_RESET_KEY) sessionStorage.removeItem(key);
-      });
+      removeKeys.forEach((key) => sessionStorage.removeItem(key));
     } catch (_) {}
   }
 
@@ -168,7 +160,7 @@
         const btn = document.getElementById('obBtn');
         const isFinal = btn && /Start first test/i.test(btn.textContent || '');
         if (isFinal && typeof window.goTo === 'function') {
-          window.goTo('guided');
+          window.goTo('reaction');
           return;
         }
         return originalObNext.apply(this, arguments);
