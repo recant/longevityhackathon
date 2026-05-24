@@ -12,7 +12,7 @@ function goSlide(n){
   obN=n;
   document.getElementById('obBtn').textContent=n===3?'Start first test →':'Next';
 }
-function obNext(){if(obN<3)goSlide(obN+1);else goTo('sit-stand');}
+function obNext(){if(obN<3)goSlide(obN+1);else goTo('dashboard');}
 
 function openTasks(){document.getElementById('tasksOverlay').classList.add('open');document.getElementById('tasksSheet').classList.add('open');}
 function closeTasks(){document.getElementById('tasksOverlay').classList.remove('open');document.getElementById('tasksSheet').classList.remove('open');}

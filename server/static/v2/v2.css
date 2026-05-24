@@ -133,7 +133,7 @@ body{font-family:'DM Sans',sans-serif;background:#1a1f1c;display:flex;justify-co
 .cp{position:absolute;width:7px;height:7px;border-radius:2px;animation:confettiFall 0.75s ease forwards}
 
 /* Test / form screens — fixed header + scrollable body within 844px frame */
-#walk,#reaction,#chair-rise,#profile,#sit-stand,#guided{background:var(--cream);display:flex;flex-direction:column;height:100%;min-height:0;overflow:hidden}
+#walk,#reaction,#chair-rise,#profile,#guided{background:var(--cream);display:flex;flex-direction:column;height:100%;min-height:0;overflow:hidden}
 .test-header{background:var(--terracotta);border-radius:0 0 26px 26px;padding:44px 20px 16px;color:white;text-align:center;flex-shrink:0}
 .test-header h2{font-family:'Lora',serif;font-size:23px;font-weight:500;margin-bottom:3px}
 .test-header p{font-size:12px;opacity:0.72}

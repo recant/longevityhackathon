@@ -51,8 +51,6 @@ from scoring import (
     score_gait_from_cv,
     score_reaction,
 )
-from share_auth import ShareAuthMiddleware, share_auth_enabled
-
 STATIC_DIR = Path(__file__).parent / "static"
 UI_DIR = STATIC_DIR / "ui"
 V2_DIR = STATIC_DIR / "v2"
@@ -92,7 +90,6 @@ class NoCacheMiddleware(BaseHTTPMiddleware):
 
 
 app.add_middleware(NoCacheMiddleware)
-app.add_middleware(ShareAuthMiddleware)
 
 
 @app.on_event("startup")
@@ -230,7 +227,7 @@ async def reset_data() -> dict[str, Any]:
 
 
 @app.get("/api/health")
-async def health() -> dict[str, str]:
+async def health() -> dict[str, Any]:
     try:
         import mediapipe  # noqa: F401
 
@@ -244,7 +241,6 @@ async def health() -> dict[str, str]:
         "ui_v2_preview": "/v2/",
         "cv_backend": cv_backend,
         "build": BUILD_ID,
-        "share_auth": share_auth_enabled(),
     }
 
 

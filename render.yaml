@@ -1,7 +1,4 @@
-# Private shareable demo — Render Blueprint (free tier).
-# Docs: DEPLOY.md
-# Note: Free tier has ephemeral storage; SQLite resets on redeploy. Upgrade to a paid
-# instance and add a persistent disk in the dashboard if you need data to persist.
+# Render Blueprint — connect repo and deploy (New → Blueprint).
 services:
   - type: web
     name: longevitree-demo
@@ -14,7 +11,3 @@ services:
     envVars:
       - key: PYTHON_VERSION
         value: "3.12.7"
-      - key: SHARE_USER
-        sync: false
-      - key: SHARE_PASSWORD
-        sync: false

@@ -137,7 +137,6 @@ function goTo(id) {
   if (id === "graphs") renderGraphs();
   if (id === "walk") resetWalkUi();
   if (id === "chair-rise") resetChairRiseUi();
-  if (id === "sit-stand") resetSitStandUi();
   if (id === "reaction") resetReactionUi();
   if (id === "profile") loadProfileForm();
 
@@ -163,22 +162,23 @@ function goSlide(n) {
   document.querySelectorAll(".ob-dot").forEach((d, i) => d.classList.toggle("active", i === n));
   obN = n;
   const btn = document.getElementById("obBtn");
-  if (btn) btn.textContent = n === 3 ? "Start first test →" : "Next";
+  if (btn) btn.textContent = n === 3 ? "Go to home →" : "Next";
   const p = document.getElementById("obParentHint");
   if (p) p.textContent = parentName;
 }
 
 function obNext() {
   if (obN < 3) goSlide(obN + 1);
-  else {
-    sessionStorage.setItem(SKIP_ONBOARDING_KEY, "1");
-    goTo("sit-stand");
-  }
+  else finishOnboarding();
+}
+
+function finishOnboarding() {
+  sessionStorage.setItem(SKIP_ONBOARDING_KEY, "1");
+  goTo("dashboard");
 }
 
 function skipOnboarding() {
-  sessionStorage.setItem(SKIP_ONBOARDING_KEY, "1");
-  goTo("splash");
+  finishOnboarding();
 }
 
 // ---- Journals ----
@@ -516,101 +516,7 @@ function setupChairRise() {
   });
 }
 
-// ---- Sit & stand 30s ----
-let ssInt = null,
-  ssSec = 30,
-  ssR = 0,
-  selEff_ = null,
-  lastChairScores = null;
-
-function resetSitStandUi() {
-  if (ssInt) clearInterval(ssInt);
-  ssInt = null;
-  ssSec = 30;
-  ssR = 0;
-  selEff_ = null;
-  document.querySelectorAll(".eff-btn").forEach((b) => b.classList.remove("sel"));
-  ["ssReady", "ssRunning", "ssEffort", "ssResult"].forEach((id, i) => {
-    const el = document.getElementById(id);
-    if (el) el.classList.toggle("show", i === 0);
-  });
-  const t = document.getElementById("ssTimer");
-  if (t) t.textContent = "30";
-  document.getElementById("ssRepsD").textContent = "0";
-}
-
-function startSS() {
-  document.getElementById("ssReady")?.classList.remove("show");
-  document.getElementById("ssRunning")?.classList.add("show");
-  ssSec = 30;
-  ssR = 0;
-  document.getElementById("ssTimerR").textContent = "30";
-  document.getElementById("ssRepsR").textContent = "0";
-  ssInt = setInterval(() => {
-    ssSec--;
-    document.getElementById("ssTimerR").textContent = ssSec;
-    if (ssSec <= 0) {
-      clearInterval(ssInt);
-      finishSS();
-    }
-  }, 1000);
-}
-function countRep() {
-  ssR++;
-  document.getElementById("ssRepsR").textContent = ssR;
-}
-function undoRep() {
-  if (ssR > 0) {
-    ssR--;
-    document.getElementById("ssRepsR").textContent = ssR;
-  }
-}
-function finishSS() {
-  if (ssInt) clearInterval(ssInt);
-  document.getElementById("ssRunning")?.classList.remove("show");
-  document.getElementById("ssEffort")?.classList.add("show");
-  const fr = document.getElementById("finalReps");
-  if (fr) fr.textContent = ssR;
-  const sub = document.getElementById("ssCompleteSub");
-  if (sub) sub.innerHTML = `${escapeHtml(parentName)} completed <span class="rep-count">${ssR}</span> reps in 30 seconds`;
-}
-function selEff(btn, v) {
-  selEff_ = v;
-  document.querySelectorAll(".eff-btn").forEach((b) => b.classList.remove("sel"));
-  btn.classList.add("sel");
-}
-
-async function showChairRepsResult() {
-  const outEl = document.getElementById("ssResult");
-  document.getElementById("ssEffort")?.classList.remove("show");
-  outEl?.classList.add("show");
-  try {
-    const res = await apiPost("/api/assessments/chair-reps", { reps: ssR });
-    lastChairScores = res.scores;
-    const s = res.scores;
-    document.getElementById("resReps").textContent = ssR;
-    document.getElementById("resEffort").textContent = selEff_ || "—";
-    document.getElementById("resScore").textContent = Math.round(s.score);
-    const delta = document.getElementById("resDelta");
-    if (delta) delta.textContent = "—";
-    const insight = document.getElementById("resInsight");
-    if (insight) insight.textContent = s.interpretation;
-    const title = document.getElementById("ssResultTitle");
-    if (title) title.textContent = `${parentName}'s Result`;
-    const expected = s.raw?.expected_reps;
-    if (expected) {
-      const pct = Math.min(100, (ssR / expected) * 100);
-      const fill = document.querySelector("#ssResult .norm-fill");
-      const marker = document.querySelector("#ssResult .norm-marker");
-      if (fill) fill.style.width = `${pct}%`;
-      if (marker) marker.style.left = `${pct}%`;
-    }
-    await afterAssessmentSaved();
-  } catch (e) {
-    const insight = document.getElementById("resInsight");
-    if (insight) insight.textContent = e.message;
-  }
-}
+// 30s sit-to-stand UI/logic archived in v2/archived/sit-stand-30s.{html,js}
 
 // ---- Reaction ----
 const TRIALS = 5;
@@ -918,7 +824,7 @@ async function init() {
   }
 
   if (sessionStorage.getItem(SKIP_ONBOARDING_KEY) === "1") {
-    goTo("splash");
+    goTo("dashboard");
   } else {
     goTo("onboarding");
   }
@@ -946,12 +852,6 @@ window.closeTasks = closeTasks;
 window.toggleTask = toggleTask;
 window.showMilestone = showMilestone;
 window.closeMilestone = closeMilestone;
-window.startSS = startSS;
-window.countRep = countRep;
-window.undoRep = undoRep;
-window.finishSS = finishSS;
-window.selEff = selEff;
-window.showChairRepsResult = showChairRepsResult;
 window.t = t;
 
 init();

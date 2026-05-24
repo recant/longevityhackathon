@@ -1,0 +1,85 @@
+<!--
+  ARCHIVED: CDC 30-second sit-to-stand rep count UI (not loaded in v2 app).
+  To restore: paste this screen into index.html and load archived/sit-stand-30s.js from kinspan-app.js.
+-->
+<div class="screen" id="sit-stand">
+  <div class="test-header">
+    <button class="back-btn" onclick="goTo('tests')">← Back</button>
+    <h2>Sit &amp; Stand</h2>
+    <p>30 seconds · Count reps · Rate effort</p>
+  </div>
+  <div class="ss-body">
+    <div id="ssReady" class="ss-phase show">
+      <div class="ss-timer-card">
+        <div class="ss-get-ready">Get ready</div>
+        <div class="ss-timer" id="ssTimer">30</div>
+        <div class="ss-timer-lbl">seconds</div>
+        <div class="ss-reps-big" id="ssRepsD">0</div>
+        <div class="ss-reps-lbl">reps</div>
+      </div>
+      <div class="ss-btn-grid"><button class="ss-btn start" onclick="startSS()">Start Test</button></div>
+      <div class="info-box"><strong class="title">How it works</strong>Sit fully in a chair, arms crossed. When you tap Start, stand fully and sit back down as many times as possible in 30 seconds. Tap <strong class="rep-hl">Count Rep</strong> each time.</div>
+    </div>
+    <div id="ssRunning" class="ss-phase">
+      <div class="ss-timer-card">
+        <div class="ss-in-progress">Test in progress</div>
+        <div class="ss-timer" id="ssTimerR">30</div>
+        <div class="ss-timer-lbl">seconds remaining</div>
+        <div class="ss-reps-big" id="ssRepsR">0</div>
+        <div class="ss-reps-lbl">reps</div>
+      </div>
+      <div class="ss-btn-grid">
+        <button class="ss-btn rep" onclick="countRep()">+ Count Rep</button>
+        <button class="ss-btn undo" onclick="undoRep()">Undo</button>
+        <button class="ss-btn finish" onclick="finishSS()">Finish Early</button>
+      </div>
+    </div>
+    <div id="ssEffort" class="ss-phase">
+      <div class="ss-complete-card">
+        <div class="ss-complete-title">Test complete!</div>
+        <div class="ss-complete-sub" id="ssCompleteSub">Completed <span id="finalReps" class="rep-count">0</span> reps in 30 seconds</div>
+      </div>
+      <div class="effort-card">
+        <h3>How hard did that feel?</h3>
+        <p>Helps us calibrate results. A good score on an easy day means something different than the same score when tired.</p>
+        <div class="effort-scale">
+          <button class="eff-btn" onclick="selEff(this,1)">1</button>
+          <button class="eff-btn" onclick="selEff(this,2)">2</button>
+          <button class="eff-btn" onclick="selEff(this,3)">3</button>
+          <button class="eff-btn" onclick="selEff(this,4)">4</button>
+          <button class="eff-btn" onclick="selEff(this,5)">5</button>
+        </div>
+        <div class="eff-labels"><span>Very easy</span><span>Moderate</span><span>Max effort</span></div>
+      </div>
+      <div class="context-card">
+        <h3>Any context to add?</h3>
+        <div class="ctx-tags">
+          <button class="ctx-tag" onclick="this.classList.toggle('sel')">Just woke up</button>
+          <button class="ctx-tag" onclick="this.classList.toggle('sel')">After a walk</button>
+          <button class="ctx-tag" onclick="this.classList.toggle('sel')">Feeling tired</button>
+          <button class="ctx-tag" onclick="this.classList.toggle('sel')">Feeling good</button>
+          <button class="ctx-tag" onclick="this.classList.toggle('sel')">Mild pain</button>
+          <button class="ctx-tag" onclick="this.classList.toggle('sel')">After meds</button>
+        </div>
+      </div>
+      <button class="ss-btn finish ss-see-results" onclick="showChairRepsResult()">See Results →</button>
+    </div>
+    <div id="ssResult" class="ss-phase">
+      <div class="result-card">
+        <div class="ss-result-title" id="ssResultTitle">Result</div>
+        <div class="res-nums">
+          <div class="r-num"><div class="r-val" id="resScore">—</div><div class="r-lbl">Score</div></div>
+          <div class="r-num"><div class="r-val" id="resReps">0</div><div class="r-lbl">Reps</div></div>
+          <div class="r-num"><div class="r-val" id="resEffort">—</div><div class="r-lbl">Effort</div></div>
+        </div>
+        <div class="norm-wrap">
+          <div class="norm-labels-top"><span>Age-group range (70–75)</span><span>Robert ↑</span></div>
+          <div class="norm-track"><div class="norm-fill"></div><div class="norm-marker"></div></div>
+          <div class="norm-labels-bot"><span>6 reps</span><span>Avg: 10</span><span>16 reps</span></div>
+        </div>
+        <div class="res-insight" id="resInsight"></div>
+        <button class="ss-btn finish ss-back-dash" onclick="goTo('dashboard')">Back to Dashboard</button>
+      </div>
+    </div>
+  </div>
+</div>
