@@ -232,6 +232,11 @@ async def v2_ui_redirect() -> RedirectResponse:
     return RedirectResponse(url="/v2/", status_code=302)
 
 
+@app.get("/v2/")
+async def v2_ui() -> Response:
+    return _ui_file(V2_DIR / "index.html")
+
+
 if UI_DIR.is_dir():
     app.mount("/ui", StaticFiles(directory=UI_DIR), name="ui")
 
@@ -344,7 +349,7 @@ def _save_upload(video: UploadFile) -> Path:
     ext = Path(video.filename or "clip.webm").suffix or ".webm"
     dest = DATA_DIR / "videos" / f"{uuid.uuid4().hex}{ext}"
     with dest.open("wb") as f:
-        shutil.copyfileobj(video.file, f)
+        shutil.copyfileobj(video.file)
     return dest
 
 
