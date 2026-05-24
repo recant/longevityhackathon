@@ -1,13 +1,10 @@
-/**
- * LongeviTree branding patch.
- * Replaces visible KinSpan/kinspan text with LongeviTree/longevitree.
- */
 (function () {
   function replaceBrandText(value) {
     return String(value || '')
-      .replace(/KinSpan/g, 'LongeviTree')
-      .replace(/kinspan/g, 'longevitree')
-      .replace(/KINSPAN/g, 'LONGEVITREE');
+      .split('LongeviTree').join('Longevitree')
+      .split('KinSpan').join('Longevitree')
+      .split('kinspan').join('longevitree')
+      .split('KINSPAN').join('LONGEVITREE');
   }
 
   function applyBranding() {
@@ -22,9 +19,7 @@
         const next = replaceBrandText(node.nodeValue);
         if (next !== node.nodeValue) node.nodeValue = next;
       });
-    } catch (_) {
-      // Best-effort visual rebrand only.
-    }
+    } catch (_) {}
   }
 
   window.longevitreeApplyBranding = applyBranding;
