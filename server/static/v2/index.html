@@ -191,15 +191,39 @@
   <div class="screen-scroll-pad">
     <div class="digest-header">
       <button class="back-btn" onclick="goTo('dashboard')">← Back</button>
-      <h2>Treatment &amp; tracking</h2>
-      <p id="trackerSub">Habits and check-ins for <span data-parent-name>your parent</span></p>
+      <h2>Treatment plan</h2>
+      <p id="trackerSub">Personal plan for <span data-parent-name>your parent</span></p>
+      <p class="tracker-headline" id="trackerHeadline"></p>
     </div>
-    <div class="tracker-summary" id="trackerSummary">
+    <div class="tracker-summary">
       <div class="tracker-stat"><div class="tracker-stat-val" id="trackerToday">0/0</div><div class="tracker-stat-lbl">Today</div></div>
       <div class="tracker-stat"><div class="tracker-stat-val" id="trackerWeek">0%</div><div class="tracker-stat-lbl">This week</div></div>
+      <div class="tracker-stat"><div class="tracker-stat-val" id="trackerMonth">0%</div><div class="tracker-stat-lbl">This month</div></div>
     </div>
-    <p class="tracker-hint">Not medical treatment — wellness habits and home check-ins. Tap to mark done for this period.</p>
+    <div class="tracker-toolbar">
+      <div class="tracker-filters" id="trackerFilters" role="tablist">
+        <button type="button" class="tracker-filter active" data-filter="all">All</button>
+        <button type="button" class="tracker-filter" data-filter="today">Today</button>
+        <button type="button" class="tracker-filter" data-filter="due">Due</button>
+      </div>
+      <button type="button" class="sm-btn" id="trackerCompleteDaily">All dailies done</button>
+    </div>
+    <p class="tracker-hint">Wellness habits only — not prescriptions. Check off each item for this period; biomarker tests auto-complete when you log results.</p>
     <div id="trackerGroups"></div>
+    <section class="tracker-add-card" id="trackerAddCard">
+      <h3 class="tracker-section-title">Add a family habit</h3>
+      <label class="field-label">What to track</label>
+      <input class="field-input" id="customHabitLabel" placeholder="e.g. Stretch after lunch" maxlength="120" />
+      <label class="field-label">Details (optional)</label>
+      <input class="field-input" id="customHabitDetail" placeholder="e.g. 5 minutes, kitchen counter" maxlength="500" />
+      <label class="field-label">How often</label>
+      <select class="field-input" id="customHabitCadence">
+        <option value="daily">Daily</option>
+        <option value="weekly" selected>Weekly</option>
+        <option value="monthly">Monthly</option>
+      </select>
+      <button type="button" class="ss-btn finish tracker-add-btn" id="customHabitSave">Add to plan</button>
+    </section>
   </div>
   <div class="nav-bar">
     <button class="nav-item active" data-nav="dashboard" onclick="goTo('dashboard')"><svg width="19" height="19" viewBox="0 0 22 22" fill="none"><rect x="3" y="3" width="7" height="7" rx="2" stroke="currentColor" stroke-width="1.5"/><rect x="12" y="3" width="7" height="7" rx="2" stroke="currentColor" stroke-width="1.5"/><rect x="3" y="12" width="7" height="7" rx="2" stroke="currentColor" stroke-width="1.5"/><rect x="12" y="12" width="7" height="7" rx="2" stroke="currentColor" stroke-width="1.5"/></svg><span>Home</span></button>
@@ -409,15 +433,13 @@
 <!-- GUIDED / CLASSIC -->
 <div class="screen" id="guided">
   <div class="test-header header-charcoal">
-    <button class="back-btn" onclick="goTo('tests')">← Back</button>
     <h2>Full check-in</h2>
     <p>Video + guided workflow</p>
   </div>
   <div class="guided-body">
     <iframe id="guidedFrame" title="KinSpan guided check-in" src="about:blank"></iframe>
     <div class="guided-actions">
-      <button type="button" class="ss-btn finish guided-finish" onclick="finishGuidedCheckin()">Finish check-in</button>
-      <button type="button" class="ss-btn undo guided-back" onclick="goTo('tests')">← Return to tests</button>
+      <button type="button" class="ss-btn finish guided-back" onclick="goTo('tests')">← Return to tests</button>
     </div>
   </div>
 </div>

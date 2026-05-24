@@ -301,6 +301,8 @@ async def list_all_sessions(profile_id: int, limit: int = 24) -> dict[str, Any]:
 
 
 async def get_treatment_state(profile_id: int) -> dict[str, Any]:
+    from treatment_tracker import normalize_state
+
     async with aiosqlite.connect(DB_PATH) as db:
         db.row_factory = aiosqlite.Row
         cur = await db.execute(
@@ -309,17 +311,32 @@ async def get_treatment_state(profile_id: int) -> dict[str, Any]:
         )
         row = await cur.fetchone()
         if not row:
-            return {"completions": {}}
+            return normalize_state(None)
         try:
             data = json.loads(row["state_json"])
         except json.JSONDecodeError:
-            return {"completions": {}}
-        if not isinstance(data, dict):
-            return {"completions": {}}
-        completions = data.get("completions")
-        if not isinstance(completions, dict):
-            return {"completions": {}}
-        return {"completions": completions}
+            return normalize_state(None)
+        return normalize_state(data)
+
+
+async def save_treatment_state(profile_id: int, state: dict[str, Any]) -> dict[str, Any]:
+    from treatment_tracker import normalize_state
+
+    clean = normalize_state(state)
+    updated = _utc_now()
+    async with aiosqlite.connect(DB_PATH) as db:
+        await db.execute(
+            """
+            INSERT INTO treatment_tracker (profile_id, state_json, updated_at)
+            VALUES (?, ?, ?)
+            ON CONFLICT(profile_id) DO UPDATE SET
+                state_json = excluded.state_json,
+                updated_at = excluded.updated_at
+            """,
+            (profile_id, json.dumps(clean), updated),
+        )
+        await db.commit()
+    return clean
 
 
 async def save_treatment_toggle(
@@ -340,20 +357,7 @@ async def save_treatment_toggle(
         completions[item_id] = periods
     elif item_id in completions:
         del completions[item_id]
-    updated = _utc_now()
-    async with aiosqlite.connect(DB_PATH) as db:
-        await db.execute(
-            """
-            INSERT INTO treatment_tracker (profile_id, state_json, updated_at)
-            VALUES (?, ?, ?)
-            ON CONFLICT(profile_id) DO UPDATE SET
-                state_json = excluded.state_json,
-                updated_at = excluded.updated_at
-            """,
-            (profile_id, json.dumps({"completions": completions}), updated),
-        )
-        await db.commit()
-    return {"completions": completions}
+    return await save_treatment_state(profile_id, state)
 
 
 async def clear_assessment_data() -> dict[str, int]:

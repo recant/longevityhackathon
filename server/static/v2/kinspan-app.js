@@ -49,8 +49,22 @@ function withProfile(path) {
 }
 
 function apiErrorMessage(raw) {
-  return typeof formatApiError === "function" ? formatApiError(raw) : String(raw || "");
+  if (typeof formatApiError === "function") return formatApiError(raw);
+  const s = String(raw || "").trim();
+  if (!s) return "Something went wrong. Please try again.";
+  try {
+    const j = JSON.parse(s);
+    if (j && typeof j === "object") {
+      if (typeof j.detail === "string") return j.detail;
+      if (Array.isArray(j.detail)) return j.detail.map(String).join(". ");
+    }
+  } catch {
+    /* not JSON */
+  }
+  return s;
 }
+
+let treatmentTrackerUnavailable = false;
 
 async function apiGet(path) {
   const r = await fetch(withProfile(path), API_FETCH);
@@ -78,6 +92,13 @@ async function apiPut(path, body) {
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(body),
   });
+  const text = await r.text();
+  if (!r.ok) throw new Error(apiErrorMessage(text || r.statusText));
+  return text ? JSON.parse(text) : {};
+}
+
+async function apiDelete(path) {
+  const r = await fetch(withProfile(path), { ...API_FETCH, method: "DELETE" });
   const text = await r.text();
   if (!r.ok) throw new Error(apiErrorMessage(text || r.statusText));
   return text ? JSON.parse(text) : {};
@@ -368,9 +389,6 @@ function renderJournals() {
       try {
         await loadSnapshot();
         await loadHistory();
-        await loadTreatmentTracker().catch(() => {
-          treatmentTracker = null;
-        });
       } catch {
         snapshot = null;
         history = null;
@@ -457,7 +475,7 @@ function renderDashboard() {
     if (treatmentTracker?.summary) {
       const s = treatmentTracker.summary;
       if (pill) {
-        pill.textContent = `${s.done_today}/${s.due_today} today · ${s.week_pct}% this week`;
+        pill.textContent = `${s.done_today}/${s.daily_total || 0} today · ${s.week_pct}% week · ${s.month_pct ?? 0}% month`;
       }
       const preview = (treatmentTracker.groups || [])
         .flatMap((g) => g.items)
@@ -473,22 +491,12 @@ function renderDashboard() {
       } else {
         taskList.innerHTML = "<li>Loading your plan…</li>";
       }
-    } else {
+    } else if (!treatmentTrackerUnavailable) {
       loadTreatmentTracker()
         .then(() => renderDashboard())
-        .catch(() => {
-          const actions = snapshot?.actions || [];
-          if (!actions.length) {
-            taskList.innerHTML = "<li>Complete a check-in to see your action plan.</li>";
-          } else {
-            taskList.innerHTML = actions
-              .map(
-                (a) =>
-                  `<li class="task-item-static"><strong>${escapeHtml(a.title)}</strong><p class="task-sub">${escapeHtml(a.detail)}</p></li>`
-              )
-              .join("");
-          }
-        });
+        .catch(() => renderDashboardActionPreview(taskList, pill));
+    } else {
+      renderDashboardActionPreview(taskList, pill);
     }
   }
 
@@ -544,64 +552,154 @@ function updateNavForScreen(id) {
   });
 }
 
+function renderDashboardActionPreview(taskList, pill) {
+  const actions = snapshot?.actions || [];
+  if (pill && treatmentTrackerUnavailable) {
+    pill.textContent = "Action plan from check-ins";
+  }
+  if (!taskList) return;
+  if (!actions.length) {
+    taskList.innerHTML = "<li>Complete a check-in to see your action plan.</li>";
+    return;
+  }
+  taskList.innerHTML = actions
+    .map(
+      (a) =>
+        `<li class="task-item-static"><strong>${escapeHtml(a.title)}</strong><p class="task-sub">${escapeHtml(a.detail)}</p></li>`
+    )
+    .join("");
+}
+
 // ---- Treatment tracker ----
+let trackerFilter = "all";
+
 async function loadTreatmentTracker() {
-  treatmentTracker = await apiGet("/api/treatment-tracker");
-  return treatmentTracker;
+  if (treatmentTrackerUnavailable) return null;
+  try {
+    const data = await apiGet("/api/treatment-tracker");
+    if (data && typeof data === "object" && data.detail && !data.groups) {
+      throw new Error(apiErrorMessage(JSON.stringify(data)));
+    }
+    treatmentTracker = data;
+    return treatmentTracker;
+  } catch (e) {
+    const msg = apiErrorMessage(e.message || e);
+    if (/not found/i.test(msg)) {
+      treatmentTrackerUnavailable = true;
+    }
+    throw new Error(msg);
+  }
 }
 
 function trackerCheckSvg() {
   return '<svg width="11" height="11" viewBox="0 0 12 12" fill="none"><polyline points="2,6 5,9 10,3" stroke="white" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>';
 }
 
+function trackerItemsForFilter(items) {
+  if (trackerFilter === "today") {
+    return items.filter((i) => i.cadence_key === "daily");
+  }
+  if (trackerFilter === "due") {
+    return items.filter((i) => !i.done);
+  }
+  return items;
+}
+
+function renderTrackerItemCard(item) {
+  const done = !!item.done;
+  const auto = item.auto ? '<span class="tracker-auto">from test</span>' : "";
+  const streak =
+    item.streak > 1
+      ? `<span class="tracker-streak">${item.streak} ${item.cadence_key === "daily" ? "day" : item.cadence_key === "weekly" ? "wk" : "mo"} streak</span>`
+      : "";
+  const severity =
+    item.severity === "support"
+      ? '<span class="tracker-pill support">focus</span>'
+      : item.severity === "maintenance"
+        ? '<span class="tracker-pill maintain">maintain</span>'
+        : "";
+  const dots =
+    item.week_dots && item.cadence_key === "daily"
+      ? `<div class="tracker-dots">${item.week_dots
+          .map((d) => `<span class="tracker-dot ${d.done ? "on" : ""}" title="${escapeHtml(d.date)}">${d.label}</span>`)
+          .join("")}</div>`
+      : "";
+  const testBtn = item.test_route
+    ? `<button type="button" class="tracker-test-link" data-route="${escapeHtml(item.test_route)}">Run test →</button>`
+    : "";
+  const cite = item.citation_url
+    ? `<a class="tracker-cite" href="${escapeHtml(item.citation_url)}" target="_blank" rel="noopener noreferrer">${escapeHtml(item.citation || "Source")}</a>`
+    : item.citation
+      ? `<span class="tracker-cite-text">${escapeHtml(item.citation)}</span>`
+      : "";
+  const removeBtn = `<button type="button" class="tracker-remove" data-remove="${escapeHtml(item.id)}" title="${item.custom ? "Remove habit" : "Hide from plan"}">×</button>`;
+  const noteVal = escapeHtml(item.note || "");
+  return (
+    `<article class="tracker-item ${done ? "done" : ""}" data-id="${escapeHtml(item.id)}" data-period="${escapeHtml(item.period)}">` +
+    `<div class="tracker-item-row" role="button" tabindex="0">` +
+    `<div class="task-check ${done ? "done" : ""}">${done ? trackerCheckSvg() : ""}</div>` +
+    `<div class="tracker-item-body">` +
+    `<div class="tracker-item-title">${escapeHtml(item.label)} ${auto} ${severity}</div>` +
+    `<div class="tracker-item-meta">${escapeHtml(item.cadence)} · ${escapeHtml(item.period_label || item.period)} ${streak}</div>` +
+    dots +
+  `</div>${removeBtn}</div>` +
+    (item.detail ? `<p class="tracker-item-detail">${escapeHtml(item.detail)}</p>` : "") +
+    (item.rationale ? `<p class="tracker-item-rationale">${escapeHtml(item.rationale)}</p>` : "") +
+    (cite ? `<div class="tracker-cite-row">${cite}</div>` : "") +
+    testBtn +
+    `<label class="tracker-note-label">Family note</label>` +
+    `<input class="tracker-note-input field-input" data-note-for="${escapeHtml(item.id)}" value="${noteVal}" placeholder="e.g. Best after breakfast" maxlength="500" />` +
+    `</article>`
+  );
+}
+
 function renderTreatmentTracker() {
   const groupsEl = document.getElementById("trackerGroups");
   const todayEl = document.getElementById("trackerToday");
   const weekEl = document.getElementById("trackerWeek");
+  const monthEl = document.getElementById("trackerMonth");
+  const headlineEl = document.getElementById("trackerHeadline");
   if (!groupsEl) return;
 
   const paint = () => {
     const s = treatmentTracker?.summary || {};
-    if (todayEl) todayEl.textContent = `${s.done_today ?? 0}/${s.due_today ?? 0}`;
+    if (todayEl) {
+      todayEl.textContent = `${s.done_today ?? 0}/${s.daily_total ?? 0}`;
+    }
     if (weekEl) weekEl.textContent = `${s.week_pct ?? 0}%`;
+    if (monthEl) monthEl.textContent = `${s.month_pct ?? 0}%`;
+    if (headlineEl) headlineEl.textContent = s.headline || "";
+
     const groups = treatmentTracker?.groups || [];
     if (!groups.length) {
       groupsEl.innerHTML =
-        '<p class="tracker-empty">Complete a check-in first — we will build a personalized habit list from scores.</p>';
+        '<div class="tracker-empty-card"><p>Run a check-in to unlock a personalized plan from scores.</p>' +
+        '<button type="button" class="sm-btn" onclick="goTo(\'tests\')">Go to tests</button></div>';
       return;
     }
+
     groupsEl.innerHTML = groups
       .map((g) => {
-        const items = (g.items || [])
-          .map((item) => {
-            const done = !!item.done;
-            const auto = item.auto ? ' <span class="tracker-auto">from test</span>' : "";
-            const testBtn = item.test_route
-              ? `<button type="button" class="tracker-test-link" data-route="${escapeHtml(item.test_route)}">Run test →</button>`
-              : "";
-            return (
-              `<div class="tracker-item ${done ? "done" : ""}" data-id="${escapeHtml(item.id)}" data-period="${escapeHtml(item.period)}" role="button" tabindex="0">` +
-              `<div class="task-check ${done ? "done" : ""}">${done ? trackerCheckSvg() : ""}</div>` +
-              `<div class="tracker-item-body">` +
-              `<div class="tracker-item-title">${escapeHtml(item.label)}${auto}</div>` +
-              `<div class="tracker-item-meta">${escapeHtml(item.cadence)}${item.citation ? " · " + escapeHtml(item.citation) : ""}</div>` +
-              (item.detail ? `<p class="tracker-item-detail">${escapeHtml(item.detail)}</p>` : "") +
-              testBtn +
-              `</div></div>`
-            );
-          })
-          .join("");
+        const filtered = trackerItemsForFilter(g.items || []);
+        if (!filtered.length) return "";
+        const cards = filtered.map((item) => renderTrackerItemCard(item)).join("");
         return (
           `<section class="tracker-section"><h3 class="tracker-section-title">${escapeHtml(g.title)}</h3>` +
-          `<p class="tracker-section-sub">${escapeHtml(g.subtitle)}</p>${items}</section>`
+          `<p class="tracker-section-sub">${escapeHtml(g.subtitle)}</p>${cards}</section>`
         );
       })
+      .filter(Boolean)
       .join("");
 
-    groupsEl.querySelectorAll(".tracker-item").forEach((row) => {
+    if (!groupsEl.innerHTML.trim()) {
+      groupsEl.innerHTML = '<p class="tracker-empty">Nothing due in this view — try the All tab.</p>';
+    }
+
+    groupsEl.querySelectorAll(".tracker-item-row").forEach((row) => {
+      const card = row.closest(".tracker-item");
       row.addEventListener("click", (e) => {
-        if (e.target.closest(".tracker-test-link")) return;
-        toggleTreatmentItem(row.dataset.id, row.dataset.period);
+        if (e.target.closest(".tracker-remove, .tracker-test-link, .tracker-note-input, .tracker-cite")) return;
+        toggleTreatmentItem(card.dataset.id, card.dataset.period);
       });
     });
     groupsEl.querySelectorAll(".tracker-test-link").forEach((btn) => {
@@ -610,18 +708,76 @@ function renderTreatmentTracker() {
         goTo(btn.dataset.route);
       });
     });
+    groupsEl.querySelectorAll(".tracker-remove").forEach((btn) => {
+      btn.addEventListener("click", (e) => {
+        e.stopPropagation();
+        removeTreatmentItem(btn.dataset.remove);
+      });
+    });
+    groupsEl.querySelectorAll(".tracker-note-input").forEach((input) => {
+      input.addEventListener("change", () => saveTreatmentNote(input.dataset.noteFor, input.value));
+      input.addEventListener("click", (e) => e.stopPropagation());
+    });
   };
 
   if (treatmentTracker) {
     paint();
     return;
   }
-  groupsEl.innerHTML = '<p class="tracker-empty">Loading…</p>';
+  groupsEl.innerHTML = '<p class="tracker-empty">Loading your plan…</p>';
   loadTreatmentTracker()
     .then(paint)
     .catch((e) => {
-      groupsEl.innerHTML = `<p class="tracker-empty err">${escapeHtml(apiErrorMessage(e.message))}</p>`;
+      const msg = apiErrorMessage(e.message);
+      const hint = /not found/i.test(msg)
+        ? "Treatment plan API is missing — restart the KinSpan server (run server/start.ps1) so the latest code loads, then hard-refresh."
+        : msg;
+      groupsEl.innerHTML = `<p class="tracker-empty err">${escapeHtml(hint)}</p>`;
     });
+}
+
+function setupTreatmentTracker() {
+  document.querySelectorAll(".tracker-filter").forEach((btn) => {
+    btn.addEventListener("click", () => {
+      trackerFilter = btn.dataset.filter || "all";
+      document.querySelectorAll(".tracker-filter").forEach((b) => {
+        b.classList.toggle("active", b.dataset.filter === trackerFilter);
+      });
+      renderTreatmentTracker();
+    });
+  });
+  document.getElementById("trackerCompleteDaily")?.addEventListener("click", async () => {
+    try {
+      treatmentTracker = await apiPost("/api/treatment-tracker/complete-daily", {});
+      renderTreatmentTracker();
+      if (currentScreen === "dashboard") renderDashboard();
+      t("toastTreatment", "Daily habits marked done.");
+    } catch (e) {
+      t("toastTreatment", apiErrorMessage(e.message));
+    }
+  });
+  document.getElementById("customHabitSave")?.addEventListener("click", async () => {
+    const label = document.getElementById("customHabitLabel")?.value?.trim();
+    const detail = document.getElementById("customHabitDetail")?.value?.trim() || "";
+    const cadence_key = document.getElementById("customHabitCadence")?.value || "weekly";
+    if (!label) {
+      t("toastTreatment", "Enter a habit name first.");
+      return;
+    }
+    try {
+      treatmentTracker = await apiPost("/api/treatment-tracker/items", {
+        label,
+        detail,
+        cadence_key,
+      });
+      document.getElementById("customHabitLabel").value = "";
+      document.getElementById("customHabitDetail").value = "";
+      renderTreatmentTracker();
+      t("toastTreatment", "Added to your plan.");
+    } catch (e) {
+      t("toastTreatment", apiErrorMessage(e.message));
+    }
+  });
 }
 
 async function toggleTreatmentItem(itemId, period) {
@@ -636,6 +792,26 @@ async function toggleTreatmentItem(itemId, period) {
     });
     renderTreatmentTracker();
     if (currentScreen === "dashboard") renderDashboard();
+  } catch (e) {
+    t("toastTreatment", apiErrorMessage(e.message));
+  }
+}
+
+async function removeTreatmentItem(itemId) {
+  if (!itemId) return;
+  try {
+    treatmentTracker = await apiDelete(`/api/treatment-tracker/items/${encodeURIComponent(itemId)}`);
+    renderTreatmentTracker();
+    if (currentScreen === "dashboard") renderDashboard();
+  } catch (e) {
+    t("toastTreatment", apiErrorMessage(e.message));
+  }
+}
+
+async function saveTreatmentNote(itemId, note) {
+  if (!itemId) return;
+  try {
+    treatmentTracker = await apiPut("/api/treatment-tracker/note", { item_id: itemId, note });
   } catch (e) {
     t("toastTreatment", apiErrorMessage(e.message));
   }
@@ -1178,6 +1354,7 @@ async function init() {
   setupChairRise();
   setupReaction();
   setupProfile();
+  setupTreatmentTracker();
 
   try {
     await loadProfiles();
@@ -1189,9 +1366,6 @@ async function init() {
       try {
         await loadSnapshot();
         await loadHistory();
-        await loadTreatmentTracker().catch(() => {
-          treatmentTracker = null;
-        });
       } catch {
         snapshot = null;
         history = null;

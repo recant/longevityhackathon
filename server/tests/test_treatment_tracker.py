@@ -6,7 +6,10 @@ from treatment_tracker import (
     biomarker_done_for_period,
     build_treatment_items,
     build_tracker_response,
+    compute_streak,
     is_item_done,
+    new_custom_item,
+    normalize_state,
     period_for,
 )
 
@@ -41,7 +44,21 @@ def test_build_items_includes_interventions_and_tracking():
     assert any(i["group"] == "habits" for i in items)
 
 
-def test_manual_toggle_persists_in_response():
+def test_custom_item_in_plan():
+    state = normalize_state(
+        {"custom_items": [new_custom_item("Walk after dinner", "10 min", "daily")]}
+    )
+    items = build_treatment_items([], {"display_name": "Dad"}, state=state)
+    assert any(i["id"].startswith("custom-") and i["label"] == "Walk after dinner" for i in items)
+
+
+def test_dismissed_item_hidden():
+    state = normalize_state({"dismissed": ["track-mood"]})
+    items = build_treatment_items([], {"display_name": "Dad"}, state=state)
+    assert "track-mood" not in {i["id"] for i in items}
+
+
+def test_manual_toggle_and_streak():
     items = [
         {
             "id": "track-sleep",
@@ -51,8 +68,20 @@ def test_manual_toggle_persists_in_response():
         }
     ]
     period = period_for("weekly")
-    state = {"completions": {"track-sleep": [period]}}
+    state = normalize_state({"completions": {"track-sleep": [period]}})
     row = items[0]
     assert is_item_done(row, period, state["completions"], {})
-    payload = build_tracker_response(items, state, {})
+    payload = build_tracker_response(items, state, {}, profile={"display_name": "Mom"})
     assert payload["summary"]["week_done"] == 1
+    assert "headline" in payload["summary"]
+
+
+def test_daily_streak():
+    today = date(2026, 5, 23)
+    completions = {
+        "habit-a": [
+            period_for("daily", today),
+            period_for("daily", today.replace(day=22)),
+        ]
+    }
+    assert compute_streak("habit-a", "daily", completions, today) == 2

@@ -39,10 +39,16 @@ from database import (
     save_chair,
     save_gait,
     save_reaction,
+    save_treatment_state,
     save_treatment_toggle,
     update_profile,
 )
-from treatment_tracker import build_treatment_items, build_tracker_response, period_for
+from treatment_tracker import (
+    build_treatment_items,
+    build_tracker_response,
+    new_custom_item,
+    period_for,
+)
 from insights import generate_insights
 from interventions import generate_interventions
 from scoring import (
@@ -154,6 +160,17 @@ class TreatmentToggleBody(BaseModel):
     item_id: str = Field(..., min_length=1, max_length=80)
     period: str | None = None
     done: bool = True
+
+
+class TreatmentCustomBody(BaseModel):
+    label: str = Field(..., min_length=1, max_length=120)
+    detail: str = Field("", max_length=500)
+    cadence_key: str = Field("weekly", pattern="^(daily|weekly|monthly)$")
+
+
+class TreatmentNoteBody(BaseModel):
+    item_id: str = Field(..., min_length=1, max_length=80)
+    note: str = Field("", max_length=500)
 
 
 def _profile_age_sex(profile: dict[str, Any]) -> tuple[int, str | None]:
@@ -405,23 +422,29 @@ async def history(profile_id: int | None = Query(None)) -> dict:
     return await list_all_sessions(prof["id"])
 
 
-@app.get("/api/treatment-tracker")
-async def treatment_tracker(profile_id: int | None = Query(None)) -> dict[str, Any]:
-    prof = await _require_profile(profile_id)
+async def _treatment_tracker_payload(prof: dict[str, Any]) -> dict[str, Any]:
     history = await list_all_sessions(prof["id"])
     snap = _build_snapshot(prof, history)
+    state = await get_treatment_state(prof["id"])
     items = build_treatment_items(
         snap.get("categories") or [],
         prof,
         actions=snap.get("actions"),
+        state=state,
     )
-    state = await get_treatment_state(prof["id"])
-    payload = build_tracker_response(items, state, history)
+    payload = build_tracker_response(items, state, history, profile=prof)
     payload["profile"] = {
         "id": prof["id"],
         "display_name": prof.get("display_name"),
     }
+    payload["interventions"] = snap.get("interventions") or []
     return payload
+
+
+@app.get("/api/treatment-tracker")
+async def treatment_tracker(profile_id: int | None = Query(None)) -> dict[str, Any]:
+    prof = await _require_profile(profile_id)
+    return await _treatment_tracker_payload(prof)
 
 
 @app.post("/api/treatment-tracker/toggle")
@@ -430,22 +453,103 @@ async def treatment_tracker_toggle(
     profile_id: int | None = Query(None),
 ) -> dict[str, Any]:
     prof = await _require_profile(profile_id)
+    state = await get_treatment_state(prof["id"])
     history = await list_all_sessions(prof["id"])
     snap = _build_snapshot(prof, history)
     items = build_treatment_items(
         snap.get("categories") or [],
         prof,
         actions=snap.get("actions"),
+        state=state,
     )
     item = next((i for i in items if i["id"] == body.item_id), None)
     if not item:
         raise HTTPException(404, "Checklist item not found")
     period = body.period or period_for(item["cadence_key"])
     await save_treatment_toggle(prof["id"], body.item_id, period, body.done)
+    return await _treatment_tracker_payload(prof)
+
+
+@app.post("/api/treatment-tracker/items")
+async def treatment_tracker_add_item(
+    body: TreatmentCustomBody,
+    profile_id: int | None = Query(None),
+) -> dict[str, Any]:
+    prof = await _require_profile(profile_id)
     state = await get_treatment_state(prof["id"])
-    payload = build_tracker_response(items, state, history)
-    payload["profile"] = {"id": prof["id"], "display_name": prof.get("display_name")}
-    return payload
+    custom = list(state.get("custom_items") or [])
+    custom.append(new_custom_item(body.label, body.detail, body.cadence_key))
+    state["custom_items"] = custom
+    await save_treatment_state(prof["id"], state)
+    return await _treatment_tracker_payload(prof)
+
+
+@app.delete("/api/treatment-tracker/items/{item_id}")
+async def treatment_tracker_remove_item(
+    item_id: str,
+    profile_id: int | None = Query(None),
+) -> dict[str, Any]:
+    prof = await _require_profile(profile_id)
+    state = await get_treatment_state(prof["id"])
+    if item_id.startswith("custom-"):
+        state["custom_items"] = [
+            c for c in (state.get("custom_items") or []) if str(c.get("id")) != item_id
+        ]
+        completions = state.get("completions") or {}
+        if item_id in completions:
+            del completions[item_id]
+    else:
+        dismissed = list(state.get("dismissed") or [])
+        if item_id not in dismissed:
+            dismissed.append(item_id)
+        state["dismissed"] = dismissed
+    await save_treatment_state(prof["id"], state)
+    return await _treatment_tracker_payload(prof)
+
+
+@app.put("/api/treatment-tracker/note")
+async def treatment_tracker_note(
+    body: TreatmentNoteBody,
+    profile_id: int | None = Query(None),
+) -> dict[str, Any]:
+    prof = await _require_profile(profile_id)
+    state = await get_treatment_state(prof["id"])
+    notes = dict(state.get("notes") or {})
+    note = body.note.strip()
+    if note:
+        notes[body.item_id] = note
+    elif body.item_id in notes:
+        del notes[body.item_id]
+    state["notes"] = notes
+    await save_treatment_state(prof["id"], state)
+    return await _treatment_tracker_payload(prof)
+
+
+@app.post("/api/treatment-tracker/complete-daily")
+async def treatment_tracker_complete_daily(
+    profile_id: int | None = Query(None),
+) -> dict[str, Any]:
+    prof = await _require_profile(profile_id)
+    state = await get_treatment_state(prof["id"])
+    history = await list_all_sessions(prof["id"])
+    snap = _build_snapshot(prof, history)
+    items = build_treatment_items(
+        snap.get("categories") or [],
+        prof,
+        actions=snap.get("actions"),
+        state=state,
+    )
+    period = period_for("daily")
+    completions = state.setdefault("completions", {})
+    for item in items:
+        if item["cadence_key"] != "daily" or item.get("biomarker"):
+            continue
+        periods = list(completions.get(item["id"], []))
+        if period not in periods:
+            periods.append(period)
+        completions[item["id"]] = periods
+    await save_treatment_state(prof["id"], state)
+    return await _treatment_tracker_payload(prof)
 
 
 def _save_upload(video: UploadFile) -> Path:
