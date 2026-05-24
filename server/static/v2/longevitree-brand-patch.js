@@ -1,5 +1,14 @@
 (function () {
   const PLAN_KEY = 'longevitree_committed_interventions_v1';
+  const OUTPUT_CATEGORY = {
+    walkOut: 'mobility',
+    reactOut: 'cognitive_speed',
+    crOut: 'strength_stability',
+    chairOut: 'strength_stability',
+    cvWalkOut: 'mobility',
+    cvChairOut: 'strength_stability',
+    ssResult: 'strength_stability',
+  };
 
   function cleanText(value) {
     return String(value || '')
@@ -18,12 +27,16 @@
   }
 
   function escapeHtml(value) {
-    return String(value || '')
+    return String(value ?? '')
       .replace(/&/g, '&amp;')
       .replace(/</g, '&lt;')
       .replace(/>/g, '&gt;')
       .replace(/"/g, '&quot;')
       .replace(/'/g, '&#39;');
+  }
+
+  function isClassicWorkflowPage() {
+    return !!(document.getElementById('workflowStepper') && document.getElementById('wfProgress'));
   }
 
   function readPlan() {
@@ -95,6 +108,7 @@
       });
       root.querySelectorAll('*').forEach(cleanAttributes);
       removeBadBlocks();
+      fixWorkflowStepper();
     } catch (_) {}
   }
 
@@ -129,6 +143,14 @@
     return data.length ? Math.max(0, data.length - 1) : 0;
   }
 
+  function filteredInterventions(snap, category, allowOverallFallback) {
+    const items = snap?.interventions || [];
+    const exact = items.filter((item) => item.category === category);
+    if (exact.length) return exact;
+    if (allowOverallFallback) return items.filter((item) => item.category === 'overall' || !item.category);
+    return [];
+  }
+
   function interventionCardHtml(item, index) {
     return `
       <label class="lt-intervention-card">
@@ -143,18 +165,32 @@
     `;
   }
 
-  function renderInterventionChooser(container, snap) {
-    const interventions = snap?.interventions || [];
+  function renderInterventionChooser(container, snap, options = {}) {
+    const category = options.category || null;
+    const requireAllThree = !!options.requireAllThree;
+    const singleTest = !!options.singleTest;
+    const categories = snap?.categories || [];
+
+    if (requireAllThree && categories.length < 3) return;
+
+    const interventions = category
+      ? filteredInterventions(snap, category, singleTest)
+      : (snap?.interventions || []);
     if (!container || !interventions.length) return;
+
     let box = container.querySelector('.lt-intervention-chooser');
     if (!box) {
       box = document.createElement('div');
       box.className = 'lt-intervention-chooser';
       container.appendChild(box);
     }
+    const headline = singleTest ? 'Choose a treatment for this test' : 'Choose a treatment to start';
+    const copy = singleTest
+      ? 'These options are based on this completed test. Select anything you want to commit to.'
+      : 'Select the intervention you want to commit to. Longevitree will mark this point on your progress graph.';
     box.innerHTML = `
-      <h3>Choose a treatment to start</h3>
-      <p>Select the intervention you want to commit to. Longevitree will mark this point on your progress graph.</p>
+      <h3>${headline}</h3>
+      <p>${copy}</p>
       <div class="lt-intervention-list">${interventions.map(interventionCardHtml).join('')}</div>
       <button type="button" class="lt-commit-btn">Commit selected treatments</button>
       <p class="lt-commit-status" aria-live="polite"></p>
@@ -203,6 +239,45 @@
     `).join('');
   }
 
+  function categoryForSingleTest(snap, categoryName) {
+    const cats = snap?.categories || [];
+    return cats.find((c) => c.category === categoryName) || null;
+  }
+
+  function singleTestAgeHtml(cat, snap) {
+    const actual = snap?.profile?.age || snap?.overall?.chronological_age || '';
+    if (!cat?.functional_age) return '';
+    return `
+      <div class="lt-age-box">
+        <strong>Functional age estimate from this test</strong>
+        <span>${escapeHtml(cat.functional_age)}</span>
+        ${actual ? `<small>Actual age: ${escapeHtml(actual)}</small>` : ''}
+      </div>
+    `;
+  }
+
+  function renderSingleTestExtras(targetEl, snap, categoryName) {
+    if (!targetEl || !snap || !categoryName) return;
+    const cat = categoryForSingleTest(snap, categoryName);
+    if (!cat) return;
+    const container = targetEl.parentElement || targetEl;
+    let box = container.querySelector('.lt-single-extra');
+    if (!box) {
+      box = document.createElement('div');
+      box.className = 'lt-single-extra';
+      container.appendChild(box);
+    }
+    box.innerHTML = `
+      <div class="lt-results-summary">
+        <div class="lt-score-big">${escapeHtml(cat.score)}<span>/100</span></div>
+        <p>${escapeHtml(cat.label || 'Score')} result</p>
+        ${singleTestAgeHtml(cat, snap)}
+      </div>
+    `;
+    renderInterventionChooser(box, snap, { category: categoryName, singleTest: true });
+    applyBranding();
+  }
+
   function renderFullResults(container, snap) {
     if (!container || !snap) return;
     const overall = snap.overall || {};
@@ -214,16 +289,18 @@
     const ageHtml = hasAllThree
       ? `<div class="lt-age-box"><strong>Functional age estimate</strong><span>${escapeHtml(overall.overall_functional_age)}</span><small>Actual age: ${escapeHtml(overall.chronological_age)}</small></div>`
       : `<p class="hint">Complete all three tests to unlock the functional age estimate.</p>`;
+    const treatmentNote = hasAllThree ? '' : '<p class="hint">Treatments will appear after all three tests are complete.</p>';
 
     container.innerHTML = `
       <div class="lt-results-summary">
         ${scoreHtml}
         <p>${escapeHtml(overall.headline || 'Your completed check-ins are saved.')}</p>
         ${ageHtml}
+        ${treatmentNote}
       </div>
       ${categoryRowsHtml(categories)}
     `;
-    renderInterventionChooser(container, snap);
+    if (hasAllThree) renderInterventionChooser(container, snap, { requireAllThree: true });
     applyBranding();
   }
 
@@ -231,41 +308,32 @@
     const dash = document.getElementById('dash');
     const out = document.getElementById('dashOut');
     if (!dash || !out || !dash.classList.contains('show')) return;
-    const visibleText = (out.textContent || '').trim();
-    if (visibleText && !/^Loading/i.test(visibleText)) return;
     try {
-      if (typeof window.loadDashboard === 'function') {
-        window.loadDashboard();
-      }
-    } catch (_) {}
-    setTimeout(async () => {
-      const after = (out.textContent || '').trim();
-      if (after && !/Family explanation|Conversation tip|API_KEY|Loading/i.test(after)) {
-        try {
-          const snap = await fetchSnapshot();
-          if (snap?.interventions?.length) renderInterventionChooser(out, snap);
-        } catch (_) {}
-        return;
-      }
-      try {
-        const snap = await fetchSnapshot();
-        renderFullResults(out, snap);
-      } catch (_) {
-        out.innerHTML = '<p class="err">Could not load results. Tap Refresh or run another check-in.</p>';
-      }
-    }, 500);
+      const snap = await fetchSnapshot();
+      renderFullResults(out, snap);
+    } catch (_) {
+      out.innerHTML = '<p class="err">Could not load results. Tap Refresh or run another check-in.</p>';
+    }
   }
 
   async function showPostTestInterventions(targetEl) {
+    if (!targetEl) return;
+    if (isClassicWorkflowPage() && targetEl.id !== 'dashOut') return;
     try {
       const snap = await fetchSnapshot();
-      if (!snap?.categories?.length || !snap?.interventions?.length) return;
-      renderInterventionChooser(targetEl?.parentElement || targetEl || document.body, snap);
+      if (!snap?.categories?.length) return;
+      if (targetEl.id === 'dashOut') {
+        renderFullResults(targetEl, snap);
+        return;
+      }
+      const category = OUTPUT_CATEGORY[targetEl.id];
+      if (!category) return;
+      renderSingleTestExtras(targetEl, snap, category);
     } catch (_) {}
   }
 
   function patchResultElements() {
-    ['walkOut', 'reactOut', 'crOut', 'chairOut', 'cvWalkOut', 'cvChairOut', 'dashOut'].forEach((id) => {
+    ['walkOut', 'reactOut', 'crOut', 'chairOut', 'cvWalkOut', 'cvChairOut', 'dashOut', 'ssResult'].forEach((id) => {
       const el = document.getElementById(id);
       if (!el || el.dataset.ltObserved === '1') return;
       el.dataset.ltObserved = '1';
@@ -273,7 +341,7 @@
         applyBranding();
         const txt = el.textContent || '';
         if (id === 'dashOut') ensureFullCheckinResults();
-        if (el.style.display !== 'none' && !/error|offline|Time one|first/i.test(txt)) {
+        if ((el.style.display !== 'none' || el.classList.contains('show')) && !/error|offline|Time one|first/i.test(txt)) {
           setTimeout(() => showPostTestInterventions(el), 250);
         }
       });
@@ -320,6 +388,41 @@
     }
   }
 
+  function fixWorkflowStepper() {
+    const progress = document.getElementById('wfProgress');
+    const stepper = document.getElementById('workflowStepper');
+    if (!progress || !stepper) return;
+    const match = (progress.textContent || '').match(/Step\s+(\d+)\s+of\s+(\d+)/i);
+    if (!match) return;
+    const current = Number(match[1]);
+    const total = Number(match[2]);
+    if (!Number.isFinite(current) || !Number.isFinite(total)) return;
+
+    let children = [...stepper.querySelectorAll('.workflow-step')];
+    const existingText = stepper.textContent || '';
+    if (children.length < total && total === 6 && !/Results/i.test(existingText)) {
+      const node = document.createElement('div');
+      node.className = 'workflow-step';
+      node.innerHTML = '<div class="workflow-step-num">6</div>Results';
+      stepper.appendChild(node);
+      children = [...stepper.querySelectorAll('.workflow-step')];
+    }
+
+    children.forEach((el, idx) => {
+      const oneBased = idx + 1;
+      el.classList.toggle('active', oneBased === current);
+      el.classList.toggle('done', oneBased < current);
+      const num = el.querySelector('.workflow-step-num');
+      if (num) num.textContent = oneBased < current ? '✓' : String(oneBased);
+    });
+    const active = children[current - 1];
+    if (active) {
+      const num = active.querySelector('.workflow-step-num');
+      if (num) num.textContent = String(current);
+      active.scrollIntoView({ block: 'nearest', inline: 'center' });
+    }
+  }
+
   function patchNavigation() {
     if (window.__ltNavPatched) return;
     window.__ltNavPatched = true;
@@ -332,8 +435,9 @@
           patchResultElements();
           if (id === 'graphs') drawTreatmentMarkers();
           ensureFullCheckinResults();
+          fixWorkflowStepper();
         }, 120);
-        setTimeout(ensureFullCheckinResults, 650);
+        setTimeout(() => { ensureFullCheckinResults(); fixWorkflowStepper(); }, 650);
         return result;
       };
     }
@@ -343,8 +447,8 @@
       window.__ltWorkflowPatched = true;
       window.showWorkflowStep = function patchedShowWorkflowStep() {
         const result = oldShowWorkflowStep.apply(this, arguments);
-        setTimeout(ensureFullCheckinResults, 250);
-        setTimeout(ensureFullCheckinResults, 800);
+        setTimeout(() => { ensureFullCheckinResults(); fixWorkflowStepper(); }, 80);
+        setTimeout(() => { ensureFullCheckinResults(); fixWorkflowStepper(); }, 450);
         return result;
       };
     }
@@ -356,6 +460,7 @@
     style.id = 'ltHumanPatchStyles';
     style.textContent = `
       #workflowUnlockHint{display:none!important}
+      .workflow-step.active{background:#6B8F71!important;color:white!important;border-radius:999px}
       .lt-results-summary{background:linear-gradient(135deg,#E8EFE9,#F9F0EC);border-radius:14px;padding:14px;margin:10px 0 12px;overflow:hidden}
       .lt-results-summary p{margin:6px 0;font-size:13px;line-height:1.45;color:#4f5d56}
       .lt-score-big{font-size:38px;font-weight:800;color:#6B8F71;line-height:1}
@@ -366,6 +471,7 @@
       .lt-age-box small{font-size:12px;color:#7A8C82}
       .lt-result-row{border-left:4px solid #6E8FA3;background:#E8EFE9;border-radius:0 10px 10px 0;padding:10px 12px;margin:8px 0;display:flex;flex-direction:column;gap:3px;overflow-wrap:anywhere}
       .lt-result-row strong{font-size:13px;color:#2C3530}.lt-result-row span{font-weight:800;color:#6B8F71}.lt-result-row small{font-size:12px;color:#4f5d56;line-height:1.4}
+      .lt-single-extra{margin-top:12px}
       .lt-intervention-chooser{margin-top:14px;padding:14px;border-radius:16px;background:#fffdf9;border:1px solid rgba(176,117,96,.25);box-shadow:0 8px 24px rgba(0,0,0,.05);max-width:100%;overflow:hidden}
       .lt-intervention-chooser h3{margin:0 0 6px;font-size:16px;color:#2C3530}
       .lt-intervention-chooser p{margin:0 0 10px;font-size:12px;line-height:1.45;color:#7A8C82}
@@ -396,6 +502,7 @@
     patchResultElements();
     setTimeout(ensureFullCheckinResults, 300);
     setTimeout(drawTreatmentMarkers, 500);
+    setTimeout(fixWorkflowStepper, 500);
   });
   window.addEventListener('focus', () => {
     installStyles();
@@ -404,6 +511,7 @@
     patchResultElements();
     ensureFullCheckinResults();
     drawTreatmentMarkers();
+    fixWorkflowStepper();
   });
   document.addEventListener('click', () => setTimeout(() => {
     applyBranding();
@@ -411,12 +519,13 @@
     patchResultElements();
     ensureFullCheckinResults();
     drawTreatmentMarkers();
+    fixWorkflowStepper();
   }, 80));
   window.addEventListener('message', (event) => {
     if (String(event.data?.type || '').includes('assessment-saved') || String(event.data?.type || '').includes('workflow-finished') || String(event.data?.type || '').includes('treatment-committed')) {
       setTimeout(ensureFullCheckinResults, 500);
-      setTimeout(() => fetchSnapshot().then((snap) => renderInterventionChooser(document.querySelector('#tests .tests-scroll') || document.body, snap)).catch(() => {}), 700);
       setTimeout(drawTreatmentMarkers, 900);
+      setTimeout(fixWorkflowStepper, 200);
     }
   });
   setInterval(() => {
@@ -424,6 +533,7 @@
     patchNavigation();
     patchResultElements();
     ensureFullCheckinResults();
+    fixWorkflowStepper();
   }, 1000);
   installStyles();
   applyBranding();
