@@ -1,4 +1,26 @@
 (function () {
+  function loadVideoPathPatch() {
+    try {
+      if (document.getElementById('ltVideoCheckinPathPatchScript')) return;
+      const script = document.createElement('script');
+      script.id = 'ltVideoCheckinPathPatchScript';
+      script.src = '/v2/video-checkin-path-patch.js';
+      script.defer = true;
+      document.head.appendChild(script);
+    } catch (_) {}
+  }
+
+  function applyRequestedClassicPath() {
+    try {
+      const params = new URLSearchParams(location.search);
+      const path = params.get('path');
+      if (path === 'vision' || path === 'manual') {
+        localStorage.setItem('kinspan_path', path);
+        localStorage.setItem('longevitree_path', path);
+      }
+    } catch (_) {}
+  }
+
   function ensureWorkflowUnlockHint() {
     try {
       let hint = document.getElementById('workflowUnlockHint');
@@ -81,21 +103,30 @@
   };
 
   document.addEventListener('DOMContentLoaded', () => {
+    applyRequestedClassicPath();
+    loadVideoPathPatch();
     ensureWorkflowUnlockHint();
     patchFinishButton();
   });
   document.addEventListener('click', () => {
     setTimeout(ensureWorkflowUnlockHint, 20);
     setTimeout(patchFinishButton, 20);
+    setTimeout(loadVideoPathPatch, 20);
   }, true);
   window.addEventListener('focus', () => {
+    applyRequestedClassicPath();
+    loadVideoPathPatch();
     ensureWorkflowUnlockHint();
     patchFinishButton();
   });
   setInterval(() => {
+    applyRequestedClassicPath();
+    loadVideoPathPatch();
     ensureWorkflowUnlockHint();
     patchFinishButton();
-  }, 250);
+  }, 500);
+  applyRequestedClassicPath();
+  loadVideoPathPatch();
   ensureWorkflowUnlockHint();
   patchFinishButton();
 })();
