@@ -191,7 +191,6 @@ def _build_snapshot(profile: dict[str, Any], history: dict[str, Any]) -> dict[st
 def _clean_html(text: str) -> str:
     text = text.replace("KinSpan", "Longevitree").replace("kinspan", "longevitree").replace("KINSPAN", "LONGEVITREE")
     text = text.replace("<title>Longevitree — Test UI</title>", "<title>Longevitree — Check-in</title>")
-    text = text.replace("<h1>Longevitree</h1>", "<h1>Longevitree</h1>")
     text = text.replace("Run <code>server/start.ps1</code> (port 8003).", "")
     text = text.replace("Wellness trends only — not medical diagnosis. ", "Wellness trends only — not medical diagnosis.")
     text = text.replace("Complete this step to unlock Continue.", "")
@@ -199,6 +198,7 @@ def _clean_html(text: str) -> str:
     scripts = [
         '<script src="/v2/classic-safety-patch.js"></script>',
         '<script src="/v2/longevitree-brand-patch.js"></script>',
+        '<script src="/v2/button-rescue.js"></script>',
     ]
     if "</body>" in text:
         for script in scripts:
