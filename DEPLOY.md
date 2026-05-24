@@ -23,14 +23,18 @@ The app is **not indexed** and **not on GitHub Pages** (which requires a public 
    - `SHARE_USER` — e.g. `demo`
    - `SHARE_PASSWORD` — a long random string (password manager or `openssl rand -base64 24`)
    - Optional: `OPENAI_API_KEY` or `OLLAMA_API_KEY` for AI insights
-5. Deploy. Your URL will look like: `https://longevitree-demo.onrender.com`
-6. Share **only** with people you trust:
+5. Click **Apply** / **Create** and wait for the deploy to turn **Live** (first build ~3–5 min).
+6. Open `https://<your-service-name>.onrender.com/api/health` — should return `"status":"ok"` without a password.
+7. Open the app root URL — browser will prompt for **SHARE_USER** / **SHARE_PASSWORD**.
+8. Share **only** with people you trust:
    - Link: `https://longevitree-demo.onrender.com`
    - Username / password from step 4
 
 Browsers will show a standard login prompt the first time they open the link.
 
-**Note:** Free Render services sleep after inactivity; the first visit may take ~30s to wake up.
+**Note:** Free Render services sleep after inactivity; the first visit may take ~30–60s to wake up.
+
+**Data on free tier:** Scores and uploads live in the container filesystem and **reset when Render redeploys or restarts**. Fine for hackathon demos; use a paid instance + persistent disk if you need long-term storage.
 
 ---
 
@@ -64,7 +68,7 @@ Others on your LAN can open `http://<your-ip>:8000` and use the same credentials
 | `SHARE_USER` | For private link | HTTP Basic Auth username |
 | `SHARE_PASSWORD` | For private link | HTTP Basic Auth password |
 | `SHARE_REALM` | No | Browser login dialog title (default: `Longevitree demo`) |
-| `PARENT_PACE_DATA_DIR` | On Render | Persistent SQLite + uploads (`/var/data` in `render.yaml`) |
+| `PARENT_PACE_DATA_DIR` | Optional | Override SQLite/video storage path (paid + disk only for persistence) |
 | `ALLOWED_ORIGINS` | If using Vite dev | Comma-separated CORS origins |
 
 `/api/health` stays public so Render health checks work without credentials.
