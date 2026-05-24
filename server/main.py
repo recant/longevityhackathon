@@ -1,4 +1,4 @@
-"""KinSpan API — functional aging biomarkers for family caregivers."""
+"""Longevitree API — functional aging biomarkers for family caregivers."""
 
 from __future__ import annotations
 
@@ -6,8 +6,8 @@ import os
 import shutil
 import uuid
 from pathlib import Path
+from typing import Any
 
-# Load .env from repo root or server/ (OLLAMA_API_KEY, OPENAI_API_KEY, etc.)
 try:
     from dotenv import load_dotenv
 
@@ -16,11 +16,10 @@ try:
     load_dotenv(Path(__file__).resolve().parent / ".env")
 except ImportError:
     pass
-from typing import Any
 
 from fastapi import FastAPI, File, Form, HTTPException, Request, UploadFile
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import FileResponse, RedirectResponse, Response
+from fastapi.responses import FileResponse, HTMLResponse, RedirectResponse, Response
 from fastapi.staticfiles import StaticFiles
 from starlette.middleware.base import BaseHTTPMiddleware
 from pydantic import BaseModel, Field
@@ -59,7 +58,7 @@ V2_DIR = STATIC_DIR / "v2"
 LEGACY_UI = STATIC_DIR / "index.html"
 BUILD_ID = "2026-05-24-v2-integrated"
 
-app = FastAPI(title="KinSpan API", version="0.2.0", description="Longevity translator for families")
+app = FastAPI(title="Longevitree API", version="0.2.0", description="Longevity translator for families")
 
 _cors_origins = [
     o.strip()
@@ -80,8 +79,6 @@ app.add_middleware(
 
 
 class NoCacheMiddleware(BaseHTTPMiddleware):
-    """Prevent stale HTML/JS/API scores from browser disk cache during development."""
-
     async def dispatch(self, request: Request, call_next):
         response: Response = await call_next(request)
         path = request.url.path
@@ -133,33 +130,17 @@ def _profile_age_sex(profile: dict[str, Any]) -> tuple[int, str | None]:
 
 
 def _actions_from_cited_interventions(interventions: list[dict[str, Any]]) -> list[dict[str, str]]:
-    """Backward-compatible `actions` view derived from cited interventions.
-
-    Older UI surfaces, including the classic guided check-in, render `snapshot.actions`
-    as simple title/detail objects. Keeping this adapter means those surfaces now show
-    citation-backed suggestions without deleting the original `default_actions` code.
-    """
     actions: list[dict[str, str]] = []
     for item in interventions:
         citation = item.get("citation") or {}
         suggestion = str(item.get("suggestion") or "")
         rationale = str(item.get("rationale") or "")
         title = str(item.get("title") or "Suggested habit")
-
-        evidence_bits: list[str] = []
-        if citation.get("short"):
-            evidence_bits.append(f"Evidence: {citation['short']}")
-        if citation.get("doi"):
-            evidence_bits.append(f"DOI: {citation['doi']}")
-        if citation.get("url"):
-            evidence_bits.append(f"Source: {citation['url']}")
-
+        evidence = str(citation.get("display") or citation.get("short") or "Peer-reviewed source")
         detail_parts = [suggestion]
         if rationale:
-            detail_parts.append(f"Why: {rationale}")
-        if evidence_bits:
-            detail_parts.append(" ".join(evidence_bits))
-
+            detail_parts.append(f"Because: {rationale}")
+        detail_parts.append(f"Evidence: {evidence}")
         actions.append({"title": title, "detail": " ".join(part for part in detail_parts if part)})
     return actions
 
@@ -196,33 +177,44 @@ def _build_snapshot(profile: dict[str, Any], history: dict[str, Any]) -> dict[st
     overall = overall_snapshot(categories, age)
     interventions = generate_interventions(categories, profile)
     return {
-        "profile": {
-            "id": profile["id"],
-            "display_name": profile["display_name"],
-            "age": age,
-            "sex": sex,
-        },
+        "profile": {"id": profile["id"], "display_name": profile["display_name"], "age": age, "sex": sex},
         "overall": overall,
         "categories": categories,
         "actions": _actions_from_cited_interventions(interventions),
         "legacy_actions": default_actions(categories),
         "interventions": interventions,
         "tracking_checklist": TRACKING_CHECKLIST,
-        "history_counts": {
-            "reactions": len(reactions),
-            "gaits": len(gaits),
-            "chairs": len(chairs),
-        },
+        "history_counts": {"reactions": len(reactions), "gaits": len(gaits), "chairs": len(chairs)},
     }
 
 
-def _ui_file(path: Path) -> FileResponse:
+def _clean_html(text: str) -> str:
+    text = text.replace("KinSpan", "Longevitree").replace("kinspan", "longevitree").replace("KINSPAN", "LONGEVITREE")
+    text = text.replace("<title>Longevitree — Test UI</title>", "<title>Longevitree — Check-in</title>")
+    text = text.replace("<h1>Longevitree</h1>", "<h1>Longevitree</h1>")
+    text = text.replace("Run <code>server/start.ps1</code> (port 8003).", "")
+    text = text.replace("Wellness trends only — not medical diagnosis. ", "Wellness trends only — not medical diagnosis.")
+    text = text.replace("Complete this step to unlock Continue.", "")
+    text = text.replace("CV engine: ", "")
+    scripts = [
+        '<script src="/v2/classic-safety-patch.js"></script>',
+        '<script src="/v2/longevitree-brand-patch.js"></script>',
+    ]
+    if "</body>" in text:
+        for script in scripts:
+            if script not in text:
+                text = text.replace("</body>", f"{script}\n</body>")
+    return text
+
+
+def _ui_file(path: Path) -> Response:
+    if path.suffix.lower() == ".html":
+        return HTMLResponse(_clean_html(path.read_text(encoding="utf-8")), headers={"Cache-Control": "no-store, no-cache, must-revalidate"})
     return FileResponse(path, headers={"Cache-Control": "no-store, no-cache, must-revalidate"})
 
 
 @app.get("/")
-async def root_ui() -> FileResponse:
-    """KinSpan v2 UI (integrated with API)."""
+async def root_ui() -> Response:
     if (V2_DIR / "index.html").is_file():
         return _ui_file(V2_DIR / "index.html")
     if (UI_DIR / "index.html").is_file():
@@ -231,14 +223,12 @@ async def root_ui() -> FileResponse:
 
 
 @app.get("/classic")
-async def classic_ui() -> FileResponse:
-    """Full guided test UI with video analysis."""
+async def classic_ui() -> Response:
     return _ui_file(LEGACY_UI)
 
 
 @app.get("/v2")
 async def v2_ui_redirect() -> RedirectResponse:
-    """Longevity App v2 (same UI as /)."""
     return RedirectResponse(url="/v2/", status_code=302)
 
 
@@ -251,35 +241,19 @@ if V2_DIR.is_dir():
 
 @app.post("/api/reset")
 async def reset_data() -> dict[str, Any]:
-    """Clear assessment sessions, uploaded videos, and in-memory CV pose detectors."""
     reset_pose_detectors()
     counts = await clear_assessment_data()
-    return {
-        "ok": True,
-        "cleared": counts,
-        "hint": "Hard-refresh the browser (Ctrl+Shift+R). In devtools: "
-        "localStorage.removeItem('kinspan_path'); localStorage.removeItem('kinspan_completed'); "
-        "localStorage.removeItem('kinspan_workflow_step');",
-    }
+    return {"ok": True, "cleared": counts, "hint": "Reset complete."}
 
 
 @app.get("/api/health")
-async def health() -> dict[str, str]:
+async def health() -> dict[str, Any]:
     try:
         import mediapipe  # noqa: F401
-
         cv_backend = "opencv+mediapipe"
     except ImportError:
         cv_backend = "opencv"
-    return {
-        "status": "ok",
-        "app": "kinspan",
-        "ui": "/",
-        "ui_v2_preview": "/v2/",
-        "cv_backend": cv_backend,
-        "build": BUILD_ID,
-        "share_auth": share_auth_enabled(),
-    }
+    return {"status": "ok", "app": "longevitree", "ui": "/", "ui_v2_preview": "/v2/", "cv_backend": cv_backend, "build": BUILD_ID, "share_auth": share_auth_enabled()}
 
 
 @app.get("/api/version")
@@ -291,18 +265,8 @@ async def version() -> dict[str, str]:
 async def assessment_paths() -> dict[str, Any]:
     return {
         "paths": [
-            {
-                "id": "manual",
-                "title": "At-home tests",
-                "description": "Stopwatch, tap reaction, chair counter — no video upload.",
-                "biomarkers": ["reaction", "gait", "chair"],
-            },
-            {
-                "id": "computer_vision",
-                "title": "Video analysis",
-                "description": "Film walking and chair rises; computer vision estimates speed, gait, and reps.",
-                "biomarkers": ["gait_video", "chair_video", "reaction_optional"],
-            },
+            {"id": "manual", "title": "At-home tests", "description": "Stopwatch, tap reaction, chair counter — no video upload.", "biomarkers": ["reaction", "gait", "chair"]},
+            {"id": "computer_vision", "title": "Video analysis", "description": "Film walking and chair rises; computer vision estimates speed, gait, and reps.", "biomarkers": ["gait_video", "chair_video", "reaction_optional"],},
         ]
     }
 
@@ -352,7 +316,6 @@ async def post_chair(body: ChairBody) -> dict:
 
 @app.post("/api/assessments/chair-reps")
 async def post_chair_reps(body: ChairRepsBody) -> dict:
-    """CDC STEADI 30-second chair stand — rep count scoring (Rikli norms)."""
     prof = await get_default_profile()
     age, sex = _profile_age_sex(prof)
     scores = score_chair_stand(body.reps, age, sex)
@@ -386,10 +349,7 @@ def _save_upload(video: UploadFile) -> Path:
 
 
 @app.post("/api/assessments/cv/walk")
-async def post_cv_walk(
-    video: UploadFile = File(...),
-    distance_meters: float = Form(3.048),
-) -> dict[str, Any]:
+async def post_cv_walk(video: UploadFile = File(...), distance_meters: float = Form(3.048)) -> dict[str, Any]:
     prof = await get_default_profile()
     age, sex = _profile_age_sex(prof)
     dest = _save_upload(video)
@@ -404,7 +364,7 @@ async def post_cv_walk(
         raise HTTPException(400, str(e)) from e
     except Exception as e:
         dest.unlink(missing_ok=True)
-        raise HTTPException(500, f"Video analysis failed: {e}") from e
+        raise HTTPException(500, "Video analysis failed. Please try another clip.") from e
     session = await save_gait(prof["id"], float(cv["time_seconds"]), scores)
     dest.unlink(missing_ok=True)
     return {"session": session, "scores": scores, "cv": cv}
@@ -426,7 +386,7 @@ async def post_cv_chair(video: UploadFile = File(...)) -> dict[str, Any]:
         raise HTTPException(400, str(e)) from e
     except Exception as e:
         dest.unlink(missing_ok=True)
-        raise HTTPException(500, f"Video analysis failed: {e}") from e
+        raise HTTPException(500, "Video analysis failed. Please try another clip.") from e
     session = await save_chair(prof["id"], 1, scores)
     dest.unlink(missing_ok=True)
     return {"session": session, "scores": scores, "cv": cv}
@@ -434,5 +394,4 @@ async def post_cv_chair(video: UploadFile = File(...)) -> dict[str, Any]:
 
 if __name__ == "__main__":
     import uvicorn
-
     uvicorn.run("main:app", host="0.0.0.0", port=8000, reload=True)
