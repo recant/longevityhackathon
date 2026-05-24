@@ -1,4 +1,4 @@
-"""Treatment checklist: habits, monitoring, completion tracking, and custom items."""
+"""Treatment checklist: cited interventions, monitoring, completion tracking, and custom items."""
 
 from __future__ import annotations
 
@@ -8,7 +8,7 @@ from datetime import date, datetime, timedelta, timezone
 from typing import Any
 
 from interventions import generate_interventions
-from scoring import TRACKING_CHECKLIST, default_actions
+from scoring import TRACKING_CHECKLIST
 
 CADENCE_LABELS = {"daily": "Daily", "weekly": "Weekly", "monthly": "Monthly"}
 
@@ -94,6 +94,10 @@ def _session_in_period(created_at: str, cadence_key: str, period: str) -> bool:
     return period_for(cadence_key, d) == period
 
 
+def _citation_label(cit: dict[str, Any]) -> str:
+    return str(cit.get("display") or cit.get("short") or "Peer-reviewed source")
+
+
 def build_treatment_items(
     categories: list[dict[str, Any]],
     profile: dict[str, Any],
@@ -101,7 +105,11 @@ def build_treatment_items(
     actions: list[dict[str, str]] | None = None,
     state: dict[str, Any] | None = None,
 ) -> list[dict[str, Any]]:
-    """Merge interventions, action plan, monitoring checklist, and custom habits."""
+    """Merge cited interventions, monitoring checklist, and custom habits.
+
+    Interventions are intentionally hidden until at least one scored test exists.
+    Generated intervention items must have peer-reviewed citation metadata.
+    """
     state = normalize_state(state)
     dismissed = set(state.get("dismissed") or [])
     items: list[dict[str, Any]] = []
@@ -115,6 +123,8 @@ def build_treatment_items(
 
     for inv in generate_interventions(categories, profile):
         cit = inv.get("citation") or {}
+        if not cit.get("peer_reviewed"):
+            continue
         add(
             {
                 "id": str(inv["id"]),
@@ -124,34 +134,13 @@ def build_treatment_items(
                 "rationale": inv.get("rationale") or "",
                 "cadence": "Daily",
                 "cadence_key": "daily",
-                "citation": cit.get("short"),
+                "citation": _citation_label(cit),
                 "citation_url": cit.get("url"),
                 "severity": inv.get("severity"),
                 "category": inv.get("category"),
                 "test_route": None,
                 "custom": False,
                 "priority": 1 if inv.get("severity") == "support" else 2,
-            }
-        )
-
-    for act in actions or default_actions(categories):
-        aid = f"action-{_slug(act.get('title', 'habit'))}"
-        add(
-            {
-                "id": aid,
-                "group": "habits",
-                "label": act["title"],
-                "detail": act.get("detail", ""),
-                "rationale": "",
-                "cadence": "Weekly",
-                "cadence_key": "weekly",
-                "citation": None,
-                "citation_url": None,
-                "severity": None,
-                "category": None,
-                "test_route": None,
-                "custom": False,
-                "priority": 3,
             }
         )
 
@@ -181,24 +170,6 @@ def build_treatment_items(
                 "biomarker": bool(row.get("biomarker")),
                 "custom": False,
                 "priority": 0 if row.get("biomarker") else 4,
-            }
-        )
-
-    if not any(i["group"] == "habits" for i in items):
-        add(
-            {
-                "id": "habit-monthly-checkin",
-                "group": "habits",
-                "label": "Monthly KinSpan check-in",
-                "detail": "Run walk, sit & stand, and reaction tests together once a month.",
-                "rationale": "Monthly biomarkers build a trajectory families can discuss with clinicians.",
-                "cadence": "Monthly",
-                "cadence_key": "monthly",
-                "citation": None,
-                "citation_url": None,
-                "test_route": "guided",
-                "custom": False,
-                "priority": 2,
             }
         )
 
@@ -343,9 +314,8 @@ def build_tracker_response(
         ck = item["cadence_key"]
         period = period_for(ck, today)
         done = is_item_done(item, period, completions, history)
-        if ck == "daily":
-            if done:
-                done_today += 1
+        if ck == "daily" and done:
+            done_today += 1
         streak = compute_streak(item["id"], ck, completions, today)
         iid = item["id"]
         row = {
@@ -353,9 +323,7 @@ def build_tracker_response(
             "period": period,
             "period_label": period_label(ck, period),
             "done": done,
-            "auto": bool(
-                item.get("biomarker") and done and period not in completions.get(iid, [])
-            ),
+            "auto": bool(item.get("biomarker") and done and period not in completions.get(iid, [])),
             "streak": streak,
             "note": notes.get(iid, ""),
         }
@@ -364,9 +332,7 @@ def build_tracker_response(
         enriched.append(row)
 
     weekly_done = sum(1 for i in weekly_items if is_item_done(i, period_for("weekly", today), completions, history))
-    monthly_done = sum(
-        1 for i in monthly_items if is_item_done(i, period_for("monthly", today), completions, history)
-    )
+    monthly_done = sum(1 for i in monthly_items if is_item_done(i, period_for("monthly", today), completions, history))
     weekly_total = len(weekly_items) or 1
     monthly_total = len(monthly_items) or 1
     daily_total = len(daily_items) or 1
@@ -375,26 +341,10 @@ def build_tracker_response(
     due_today = [i for i in enriched if i["cadence_key"] == "daily" and not i["done"]]
 
     groups_meta = [
-        {
-            "id": "habits",
-            "title": "Treatment & habits",
-            "subtitle": "Evidence-based steps from your parent's scores",
-        },
-        {
-            "id": "monitoring",
-            "title": "Scheduled check-ins",
-            "subtitle": "Home tests — auto-checked when you log results",
-        },
-        {
-            "id": "wellness",
-            "title": "Weekly wellness",
-            "subtitle": "Sleep, balance, mood, and connection",
-        },
-        {
-            "id": "custom",
-            "title": "Your family's habits",
-            "subtitle": "Goals you added together",
-        },
+        {"id": "habits", "title": "Interventions", "subtitle": "Evidence-based steps from completed test scores"},
+        {"id": "monitoring", "title": "Scheduled check-ins", "subtitle": "Home tests — auto-checked when you log results"},
+        {"id": "wellness", "title": "Weekly wellness", "subtitle": "Sleep, balance, mood, and connection"},
+        {"id": "custom", "title": "Your family's habits", "subtitle": "Goals you added together"},
     ]
     grouped = []
     for g in groups_meta:
@@ -404,13 +354,13 @@ def build_tracker_response(
 
     name = (profile or {}).get("display_name") or "your parent"
     if done_today == daily_total and daily_total > 0:
-        headline = f"All daily habits done for {name} today."
+        headline = f"All daily items done for {name} today."
     elif due_today:
-        headline = f"{len(due_today)} daily habit{'s' if len(due_today) != 1 else ''} left for today."
+        headline = f"{len(due_today)} daily item{'s' if len(due_today) != 1 else ''} left for today."
     elif weekly_done < weekly_total:
         headline = f"{weekly_total - weekly_done} weekly item{'s' if weekly_total - weekly_done != 1 else ''} still open this week."
     else:
-        headline = "Great consistency — keep the gentle rhythm going."
+        headline = "Check-ins are up to date."
 
     return {
         "items": enriched,
@@ -433,11 +383,7 @@ def build_tracker_response(
     }
 
 
-def new_custom_item(
-    label: str,
-    detail: str = "",
-    cadence_key: str = "weekly",
-) -> dict[str, Any]:
+def new_custom_item(label: str, detail: str = "", cadence_key: str = "weekly") -> dict[str, Any]:
     ck = cadence_key if cadence_key in CADENCE_LABELS else "weekly"
     return {
         "id": f"custom-{uuid.uuid4().hex[:12]}",
