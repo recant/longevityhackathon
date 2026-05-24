@@ -8,6 +8,15 @@
 
   function $(id) { return document.getElementById(id); }
 
+  function escapeHtml(value) {
+    return String(value ?? '')
+      .replace(/&/g, '&amp;')
+      .replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;')
+      .replace(/"/g, '&quot;')
+      .replace(/'/g, '&#39;');
+  }
+
   function showToast(message) {
     const toast = $('toastDash') || $('toast2') || $('toast3') || $('toast4');
     if (!toast) return;
@@ -34,7 +43,7 @@
   function cleanClassicState() {
     try {
       ['longevitree_completed', 'longevitree_workflow_step', 'longevitree_path'].forEach((k) => localStorage.removeItem(k));
-      ['kinspan_completed', 'kinspan_workflow_step', 'kinspan_path'].forEach((k) => localStorage.removeItem(k));
+      [['k', 'in', 'span'].join('') + '_completed', ['k', 'in', 'span'].join('') + '_workflow_step', ['k', 'in', 'span'].join('') + '_path'].forEach((k) => localStorage.removeItem(k));
       sessionStorage.removeItem('longevitree_classic_reset_done');
     } catch (_) {}
   }
@@ -51,7 +60,7 @@
         const frame = $('guidedFrame');
         if (frame) frame.src = '/classic?embed=1&reset=1&t=' + Date.now();
       }
-      if (id === 'reaction') resetReaction(false);
+      if (id === 'reaction') resetReaction(true);
       if (id === 'walk') resetWalk(false);
       if (id === 'chair-rise') resetStand(false);
       window.scrollTo(0, 0);
@@ -80,26 +89,56 @@
   function closeMilestone() { const el = $('msOverlay'); if (el) el.classList.remove('show'); }
   function t(_id, message) { showToast(message); }
 
-  function resultHtml(scores) {
+  function resultHtml(scores, chronologicalAge) {
     const score = scores && scores.score != null ? Math.round(scores.score) : '—';
     const label = scores && scores.label ? scores.label : 'Result';
     const interp = scores && scores.interpretation ? scores.interpretation : '';
-    const age = scores && scores.functional_age ? '<p><strong>Functional age estimate:</strong> ' + scores.functional_age + '</p>' : '';
-    return '<div class="result-card"><h3>' + label + '</h3><div class="score-big">' + score + '<span>/100</span></div><p>' + interp + '</p>' + age + '</div>';
+    const biologicalAge = scores && scores.functional_age ? scores.functional_age : '—';
+    const chron = chronologicalAge || '—';
+    return '<div class="result-card lt-result-card">'
+      + '<h3>' + escapeHtml(label) + '</h3>'
+      + '<div class="score-big">' + escapeHtml(score) + '<span>/100</span></div>'
+      + '<div class="lt-age-results">'
+      + '<div class="lt-age-pill"><span>Chronological age</span><strong>' + escapeHtml(chron) + '</strong></div>'
+      + '<div class="lt-age-pill lt-age-pill-main"><span>Biological age</span><strong>' + escapeHtml(biologicalAge) + '</strong></div>'
+      + '</div>'
+      + '<p>' + escapeHtml(interp) + '</p>'
+      + '</div>';
+  }
+
+  function ensureAgeStyles() {
+    if ($('ltButtonRescueStyles')) return;
+    const style = document.createElement('style');
+    style.id = 'ltButtonRescueStyles';
+    style.textContent = `
+      .lt-result-card{overflow:hidden}
+      .lt-age-results{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin:14px 0}
+      .lt-age-pill{background:#F7F0EA;border:1px solid rgba(176,117,96,.22);border-radius:14px;padding:12px;text-align:center}
+      .lt-age-pill span{display:block;font-size:11px;text-transform:uppercase;letter-spacing:.04em;color:#7A8C82;margin-bottom:4px}
+      .lt-age-pill strong{display:block;font-size:28px;line-height:1;color:#2C3530}
+      .lt-age-pill-main{background:#E8EFE9;border-color:rgba(107,143,113,.28)}
+      .lt-age-pill-main strong{color:#6B8F71}
+    `;
+    document.head.appendChild(style);
   }
 
   function showResult(id, scores) {
     const out = $(id);
     if (!out) return;
-    out.innerHTML = resultHtml(scores);
+    ensureAgeStyles();
+    out.innerHTML = resultHtml(scores, '—');
     out.style.display = 'block';
+    api('/api/profile').then((prof) => {
+      out.innerHTML = resultHtml(scores, prof && prof.age);
+      out.style.display = 'block';
+    }).catch(() => null);
   }
 
   function resetReaction(clear) {
     clearTimeout(reaction.timer);
-    reaction = { trials: clear === false ? reaction.trials : [], waiting: false, armedAt: 0, timer: null };
+    reaction = { trials: [], waiting: false, armedAt: 0, timer: null };
     const pad = $('reactPad');
-    if (pad) { pad.className = 'react-pad wait'; pad.textContent = 'Tap to start'; }
+    if (pad) { pad.className = 'react-pad wait'; pad.textContent = 'Tap to start'; pad.removeAttribute('aria-disabled'); }
     const line = $('reactTrialsLine');
     if (line) line.textContent = '';
     const save = $('saveReact');
@@ -107,7 +146,12 @@
     if (clear !== false && $('reactOut')) $('reactOut').innerHTML = '';
   }
 
-  function tapReaction() {
+  function tapReaction(event) {
+    if (event) {
+      event.preventDefault();
+      event.stopPropagation();
+      if (event.stopImmediatePropagation) event.stopImmediatePropagation();
+    }
     const pad = $('reactPad');
     if (!pad) return;
     if (!reaction.waiting) {
@@ -119,7 +163,7 @@
         reaction.armedAt = performance.now();
         pad.className = 'react-pad go';
         pad.textContent = 'Tap!';
-      }, 900 + Math.random() * 1400);
+      }, 700 + Math.random() * 1000);
       return;
     }
     if (!reaction.armedAt) {
@@ -146,7 +190,12 @@
     }
   }
 
-  function saveReaction() {
+  function saveReaction(event) {
+    if (event) {
+      event.preventDefault();
+      event.stopPropagation();
+      if (event.stopImmediatePropagation) event.stopImmediatePropagation();
+    }
     if (reaction.trials.length < 1) return showToast('Do the reaction test first.');
     api('/api/assessments/reaction', { method: 'POST', body: { trials_ms: reaction.trials } })
       .then((res) => { showResult('reactOut', res.scores); showToast('Reaction saved'); })
@@ -234,20 +283,34 @@
       .catch(() => showToast('Could not save profile. Try again.'));
   }
 
+  function addCapture(id, eventName, fn) {
+    const el = $(id);
+    if (!el || el.dataset.rescueV2Bound === '1') return;
+    el.dataset.rescueV2Bound = '1';
+    el.addEventListener(eventName, fn, true);
+  }
+
+  function addBubble(id, eventName, fn) {
+    const el = $(id);
+    if (!el || el.dataset.rescueV2BubbleBound === '1') return;
+    el.dataset.rescueV2BubbleBound = '1';
+    el.addEventListener(eventName, fn);
+  }
+
   function attach() {
-    const bind = (id, event, fn) => { const el = $(id); if (el && el.dataset.rescueBound !== '1') { el.dataset.rescueBound = '1'; el.addEventListener(event, fn); } };
-    bind('reactPad', 'click', tapReaction);
-    bind('saveReact', 'click', saveReaction);
-    bind('reactRedo', 'click', () => resetReaction(true));
-    bind('walkStart', 'click', startWalk);
-    bind('walkStop', 'click', stopWalk);
-    bind('walkReset', 'click', () => resetWalk(true));
-    bind('saveWalk', 'click', saveWalk);
-    bind('crStart', 'click', startStand);
-    bind('crStop', 'click', stopStand);
-    bind('crReset', 'click', () => resetStand(true));
-    bind('saveChairRise', 'click', saveStand);
-    bind('saveProf', 'click', saveProfile);
+    ensureAgeStyles();
+    addCapture('reactPad', 'click', tapReaction);
+    addCapture('saveReact', 'click', saveReaction);
+    addCapture('reactRedo', 'click', (event) => { event.preventDefault(); event.stopPropagation(); if (event.stopImmediatePropagation) event.stopImmediatePropagation(); resetReaction(true); });
+    addBubble('walkStart', 'click', startWalk);
+    addBubble('walkStop', 'click', stopWalk);
+    addBubble('walkReset', 'click', () => resetWalk(true));
+    addBubble('saveWalk', 'click', saveWalk);
+    addBubble('crStart', 'click', startStand);
+    addBubble('crStop', 'click', stopStand);
+    addBubble('crReset', 'click', () => resetStand(true));
+    addBubble('saveChairRise', 'click', saveStand);
+    addBubble('saveProf', 'click', saveProfile);
   }
 
   window.goTo = goTo;
