@@ -179,6 +179,38 @@ def _profile_age_sex(profile: dict[str, Any]) -> tuple[int, str | None]:
     return age, sex
 
 
+def _actions_from_cited_interventions(interventions: list[dict[str, Any]]) -> list[dict[str, str]]:
+    """Backward-compatible `actions` view derived from cited interventions.
+
+    Older UI surfaces, including the classic guided check-in, render `snapshot.actions`
+    as simple title/detail objects. Keeping this adapter means those surfaces now show
+    citation-backed suggestions without deleting the original `default_actions` code.
+    """
+    actions: list[dict[str, str]] = []
+    for item in interventions:
+        citation = item.get("citation") or {}
+        suggestion = str(item.get("suggestion") or "")
+        rationale = str(item.get("rationale") or "")
+        title = str(item.get("title") or "Suggested habit")
+
+        evidence_bits: list[str] = []
+        if citation.get("short"):
+            evidence_bits.append(f"Evidence: {citation['short']}")
+        if citation.get("doi"):
+            evidence_bits.append(f"DOI: {citation['doi']}")
+        if citation.get("url"):
+            evidence_bits.append(f"Source: {citation['url']}")
+
+        detail_parts = [suggestion]
+        if rationale:
+            detail_parts.append(f"Why: {rationale}")
+        if evidence_bits:
+            detail_parts.append(" ".join(evidence_bits))
+
+        actions.append({"title": title, "detail": " ".join(part for part in detail_parts if part)})
+    return actions
+
+
 def _build_snapshot(profile: dict[str, Any], history: dict[str, Any]) -> dict[str, Any]:
     age, sex = _profile_age_sex(profile)
     categories: list[dict[str, Any]] = []
@@ -209,6 +241,7 @@ def _build_snapshot(profile: dict[str, Any], history: dict[str, Any]) -> dict[st
         categories.append(cat)
 
     overall = overall_snapshot(categories, age)
+    interventions = generate_interventions(categories, profile)
     return {
         "profile": {
             "id": profile["id"],
@@ -218,8 +251,9 @@ def _build_snapshot(profile: dict[str, Any], history: dict[str, Any]) -> dict[st
         },
         "overall": overall,
         "categories": categories,
-        "actions": default_actions(categories),
-        "interventions": generate_interventions(categories, profile),
+        "actions": _actions_from_cited_interventions(interventions),
+        "legacy_actions": default_actions(categories),
+        "interventions": interventions,
         "tracking_checklist": TRACKING_CHECKLIST,
         "history_counts": {
             "reactions": len(reactions),
