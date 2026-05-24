@@ -17,6 +17,58 @@
     } catch (_) {}
   }
 
+  function isFinalWorkflowStep() {
+    try {
+      const progress = document.getElementById('wfProgress');
+      const match = (progress?.textContent || '').match(/Step\s+(\d+)\s+of\s+(\d+)/i);
+      if (!match) return false;
+      return Number(match[1]) >= Number(match[2]);
+    } catch (_) {
+      return false;
+    }
+  }
+
+  function leaveEmbeddedWorkflow() {
+    try {
+      if (window.parent && window.parent !== window) {
+        if (typeof window.parent.finishGuidedCheckin === 'function') {
+          window.parent.finishGuidedCheckin();
+          return;
+        }
+        if (typeof window.parent.goTo === 'function') {
+          window.parent.goTo('tests');
+          return;
+        }
+        window.parent.postMessage({ type: 'longevitree:workflow-finished' }, '*');
+        window.parent.postMessage({ type: 'kinspan:workflow-finished' }, '*');
+        return;
+      }
+    } catch (_) {
+      try {
+        window.parent?.postMessage?.({ type: 'longevitree:workflow-finished' }, '*');
+        window.parent?.postMessage?.({ type: 'kinspan:workflow-finished' }, '*');
+        return;
+      } catch (_) {}
+    }
+    window.location.href = '/';
+  }
+
+  function patchFinishButton() {
+    try {
+      const btn = document.getElementById('wfContinue');
+      if (!btn || btn.dataset.longevitreeFinishGuard === '1') return;
+      btn.dataset.longevitreeFinishGuard = '1';
+      btn.addEventListener('click', (event) => {
+        const label = String(btn.textContent || '').trim().toLowerCase();
+        if (label !== 'finish' && !isFinalWorkflowStep()) return;
+        event.preventDefault();
+        event.stopPropagation();
+        event.stopImmediatePropagation();
+        leaveEmbeddedWorkflow();
+      }, true);
+    } catch (_) {}
+  }
+
   const originalRemove = Element.prototype.remove;
   Element.prototype.remove = function guardedRemove() {
     if (this && this.id === 'workflowUnlockHint') {
@@ -28,9 +80,22 @@
     return originalRemove.call(this);
   };
 
-  document.addEventListener('DOMContentLoaded', ensureWorkflowUnlockHint);
-  document.addEventListener('click', () => setTimeout(ensureWorkflowUnlockHint, 20), true);
-  window.addEventListener('focus', ensureWorkflowUnlockHint);
-  setInterval(ensureWorkflowUnlockHint, 250);
+  document.addEventListener('DOMContentLoaded', () => {
+    ensureWorkflowUnlockHint();
+    patchFinishButton();
+  });
+  document.addEventListener('click', () => {
+    setTimeout(ensureWorkflowUnlockHint, 20);
+    setTimeout(patchFinishButton, 20);
+  }, true);
+  window.addEventListener('focus', () => {
+    ensureWorkflowUnlockHint();
+    patchFinishButton();
+  });
+  setInterval(() => {
+    ensureWorkflowUnlockHint();
+    patchFinishButton();
+  }, 250);
   ensureWorkflowUnlockHint();
+  patchFinishButton();
 })();
