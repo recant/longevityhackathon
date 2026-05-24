@@ -1,8 +1,8 @@
-# longevityhackathon — KinSpan
+# longevityhackathon — Longevitree
 
 **Control Group Longevity Hackathon** · [GitHub](https://github.com/recant/longevityhackathon)
 
-## KinSpan
+## Longevitree
 
 **Longevity translator for families** — a hackathon MVP that turns cheap, at-home observational biomarkers into plain-language aging trajectory insights for adult children worried about their parents.
 
