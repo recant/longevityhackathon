@@ -15,6 +15,7 @@ Intervention = dict[str, Any]
 CITATIONS: dict[str, Citation] = {
     "life_physical_activity": {
         "short": "Pahor et al., JAMA 2014",
+        "display": "Pahor et al., Effect of Structured Physical Activity",
         "full": (
             "Pahor M, Guralnik JM, Ambrosius WT, et al. Effect of structured physical "
             "activity on prevention of major mobility disability in older adults: the LIFE "
@@ -26,6 +27,7 @@ CITATIONS: dict[str, Citation] = {
     },
     "falls_exercise": {
         "short": "Sherrington et al., Br J Sports Med 2017",
+        "display": "Sherrington et al., Exercise to Prevent Falls",
         "full": (
             "Sherrington C, Michaleff ZA, Fairhall N, et al. Exercise to prevent falls "
             "in older adults: an updated systematic review and meta-analysis. British "
@@ -37,6 +39,7 @@ CITATIONS: dict[str, Citation] = {
     },
     "protein_older_adults": {
         "short": "Bauer et al., J Am Med Dir Assoc 2013",
+        "display": "Bauer et al., Optimal Dietary Protein Intake in Older People",
         "full": (
             "Bauer J, Biolo G, Cederholm T, et al. Evidence-based recommendations for "
             "optimal dietary protein intake in older people: a position paper from the "
@@ -49,6 +52,7 @@ CITATIONS: dict[str, Citation] = {
     },
     "aerobic_cognition": {
         "short": "Smith et al., Psychosom Med 2010",
+        "display": "Smith et al., Aerobic Exercise and Neurocognitive Performance",
         "full": (
             "Smith PJ, Blumenthal JA, Hoffman BM, et al. Aerobic exercise and "
             "neurocognitive performance: a meta-analytic review of randomized controlled "
@@ -60,6 +64,7 @@ CITATIONS: dict[str, Citation] = {
     },
     "mediterranean_cognition": {
         "short": "Martinez-Lapiscina et al., JNNP 2013",
+        "display": "Martinez-Lapiscina et al., Mediterranean Diet Improves Cognition",
         "full": (
             "Martinez-Lapiscina EH, Clavero P, Toledo E, et al. Mediterranean diet "
             "improves cognition: the PREDIMED-NAVARRA randomised trial. Journal of "
@@ -108,20 +113,17 @@ def _make(
     rationale: str,
     citation_key: str,
 ) -> Intervention:
+    citation = CITATIONS[citation_key]
     return {
         "id": id,
         "category": category,
         "score": score,
         "severity": _severity(score),
-        "trigger": (
-            "No score recorded yet"
-            if score is None
-            else f"{category.replace('_', ' ').title()} score {score:.1f}/100"
-        ),
+        "trigger": f"{category.replace('_', ' ').title()} score {score:.1f}/100" if score is not None else "No score recorded yet",
         "title": title,
         "suggestion": suggestion,
         "rationale": rationale,
-        "citation": CITATIONS[citation_key],
+        "citation": citation,
     }
 
 
@@ -129,16 +131,9 @@ def generate_interventions(
     categories: list[dict[str, Any]],
     profile: dict[str, Any] | None = None,
 ) -> list[Intervention]:
-    """Return practical, non-medication ideas matched to the latest scores.
-
-    Conservative thresholding is intentional: this is a family wellness product,
-    so recommendations stay small, behavior-based, and non-diagnostic.
-    """
+    """Return practical, cited, non-medication ideas matched to completed test scores."""
     if not categories:
         return []
-
-    profile = profile or {}
-    name = profile.get("display_name") or "your parent"
 
     cognitive = _find_category(categories, "cognitive_speed")
     mobility = _find_category(categories, "mobility")
@@ -157,15 +152,8 @@ def generate_interventions(
                 category="mobility",
                 score=mobility_score,
                 title="Walk around the block once a day",
-                suggestion=(
-                    "Start with one comfortable walk around the block, or 5-10 minutes if a "
-                    "full block is too much. Keep the pace conversational and build gradually."
-                ),
-                rationale=(
-                    "The LIFE randomized trial used structured physical activity centered on "
-                    "walking, strength, balance, and flexibility to reduce major mobility "
-                    "disability in sedentary older adults."
-                ),
+                suggestion="Start with one comfortable walk around the block, or 5-10 minutes if a full block is too much. Keep the pace conversational and build gradually.",
+                rationale="The LIFE randomized trial used structured physical activity centered on walking, strength, balance, and flexibility to reduce major mobility disability in sedentary older adults.",
                 citation_key="life_physical_activity",
             )
         )
@@ -177,15 +165,8 @@ def generate_interventions(
                 category="strength_stability",
                 score=strength_score,
                 title="Do a tiny sit-to-stand set after breakfast",
-                suggestion=(
-                    "Try 5 slow sit-to-stands from a sturdy chair after breakfast, using hands "
-                    "for support if needed. Stop if there is pain, dizziness, or unsafe balance."
-                ),
-                rationale=(
-                    "Exercise programs that challenge balance and functional strength reduce "
-                    "falls in older adults; sit-to-stand practice is a simple home version of "
-                    "functional lower-body strengthening."
-                ),
+                suggestion="Try 5 slow sit-to-stands from a sturdy chair after breakfast, using hands for support if needed. Stop if there is pain, dizziness, or unsafe balance.",
+                rationale="Exercise programs that challenge balance and functional strength reduce falls in older adults; sit-to-stand practice is a simple home version of functional lower-body strengthening.",
                 citation_key="falls_exercise",
             )
         )
@@ -197,16 +178,8 @@ def generate_interventions(
                 category="strength_stability",
                 score=strength_score,
                 title="Add a protein anchor to each meal",
-                suggestion=(
-                    "Include a palm-sized protein source at breakfast, lunch, and dinner - for "
-                    "example eggs, yogurt, tofu, beans, fish, chicken, or lentils. Ask a clinician "
-                    "first if kidney disease or a protein restriction is present."
-                ),
-                rationale=(
-                    "The PROT-AGE position paper recommends attention to higher-quality, "
-                    "adequately distributed protein intake in older adults to support muscle "
-                    "maintenance and function."
-                ),
+                suggestion="Include a palm-sized protein source at breakfast, lunch, and dinner — for example eggs, yogurt, tofu, beans, fish, chicken, or lentils. Ask a clinician first if kidney disease or a protein restriction is present.",
+                rationale="The PROT-AGE position paper recommends attention to higher-quality, adequately distributed protein intake in older adults to support muscle maintenance and function.",
                 citation_key="protein_older_adults",
             )
         )
@@ -218,16 +191,8 @@ def generate_interventions(
                 category="cognitive_speed",
                 score=cognitive_score,
                 title="Pair a short walk with a light brain game",
-                suggestion=(
-                    "Do a 10-minute easy walk, then a simple mentally engaging activity like a "
-                    "card game, word game, or recalling a family story together. Keep it playful, "
-                    "not like a test."
-                ),
-                rationale=(
-                    "A meta-analysis of randomized trials found aerobic exercise was associated "
-                    "with improvements in neurocognitive performance, supporting gentle movement "
-                    "as a cognitive-motor habit."
-                ),
+                suggestion="Do a 10-minute easy walk, then a simple mentally engaging activity like a card game, word game, or recalling a family story together. Keep it playful, not like a test.",
+                rationale="A meta-analysis of randomized trials found aerobic exercise was associated with improvements in neurocognitive performance, supporting gentle movement as a cognitive-motor habit.",
                 citation_key="aerobic_cognition",
             )
         )
@@ -239,37 +204,9 @@ def generate_interventions(
                 category="cognitive_speed",
                 score=cognitive_score,
                 title="Make one Mediterranean-style plate swap",
-                suggestion=(
-                    "Once per day, make the meal more Mediterranean-style: vegetables or fruit, "
-                    "beans or whole grains, nuts or olive oil, and fish/lean protein when possible."
-                ),
-                rationale=(
-                    "The PREDIMED-NAVARRA randomized trial reported cognitive benefits from a "
-                    "Mediterranean dietary pattern in older adults at cardiovascular risk."
-                ),
+                suggestion="Once per day, make the meal more Mediterranean-style: vegetables or fruit, beans or whole grains, nuts or olive oil, and fish or lean protein when possible.",
+                rationale="The PREDIMED-NAVARRA randomized trial reported cognitive benefits from a Mediterranean dietary pattern in older adults at cardiovascular risk.",
                 citation_key="mediterranean_cognition",
-            )
-        )
-
-    if not ideas:
-        avg_score = sum(float(c["score"]) for c in categories if c.get("score") is not None) / len(categories)
-        ideas.append(
-            _make(
-                id="maintenance-walk-strength-rhythm",
-                category="overall",
-                score=avg_score,
-                title="Keep a weekly movement rhythm",
-                suggestion=(
-                    f"Because {name}'s current scores look steady, keep the habit simple: "
-                    "walk most days and do a short strength/balance routine two or three times "
-                    "per week."
-                ),
-                rationale=(
-                    "Structured physical activity programs emphasizing walking plus strength, "
-                    "balance, and flexibility have randomized-trial evidence for preserving "
-                    "mobility in older adults."
-                ),
-                citation_key="life_physical_activity",
             )
         )
 
