@@ -1,9 +1,4 @@
-"""Evidence-linked, non-medication intervention ideas for functional aging scores.
-
-The scoring layer tells families what changed. This module turns those scores into
-small, practical next steps. Every suggestion carries a peer-reviewed citation so
-UI copy can show the evidence source directly beside the recommendation.
-"""
+"""Short, evidence-linked, non-medication intervention ideas."""
 
 from __future__ import annotations
 
@@ -14,64 +9,28 @@ Intervention = dict[str, Any]
 
 CITATIONS: dict[str, Citation] = {
     "life_physical_activity": {
-        "short": "Effect of Structured Physical Activity — Pahor et al.",
-        "display": "Effect of Structured Physical Activity — Pahor et al.",
-        "full": (
-            "Pahor M, Guralnik JM, Ambrosius WT, et al. Effect of structured physical "
-            "activity on prevention of major mobility disability in older adults: the LIFE "
-            "study randomized clinical trial. JAMA. 2014;311(23):2387-2396."
-        ),
-        "doi": "10.1001/jama.2014.5616",
-        "url": "https://doi.org/10.1001/jama.2014.5616",
+        "short": "Pahor — Effect of Structured Physical Activity",
+        "display": "Pahor — Effect of Structured Physical Activity",
         "peer_reviewed": True,
     },
     "falls_exercise": {
-        "short": "Exercise to Prevent Falls in Older Adults — Sherrington et al.",
-        "display": "Exercise to Prevent Falls in Older Adults — Sherrington et al.",
-        "full": (
-            "Sherrington C, Michaleff ZA, Fairhall N, et al. Exercise to prevent falls "
-            "in older adults: an updated systematic review and meta-analysis. British "
-            "Journal of Sports Medicine. 2017;51(24):1750-1758."
-        ),
-        "doi": "10.1136/bjsports-2016-096547",
-        "url": "https://doi.org/10.1136/bjsports-2016-096547",
+        "short": "Sherrington — Exercise to Prevent Falls",
+        "display": "Sherrington — Exercise to Prevent Falls",
         "peer_reviewed": True,
     },
     "protein_older_adults": {
-        "short": "Optimal Dietary Protein Intake in Older People — Bauer et al.",
-        "display": "Optimal Dietary Protein Intake in Older People — Bauer et al.",
-        "full": (
-            "Bauer J, Biolo G, Cederholm T, et al. Evidence-based recommendations for "
-            "optimal dietary protein intake in older people: a position paper from the "
-            "PROT-AGE Study Group. Journal of the American Medical Directors Association. "
-            "2013;14(8):542-559."
-        ),
-        "doi": "10.1016/j.jamda.2013.05.021",
-        "url": "https://doi.org/10.1016/j.jamda.2013.05.021",
+        "short": "Bauer — Optimal Dietary Protein Intake",
+        "display": "Bauer — Optimal Dietary Protein Intake",
         "peer_reviewed": True,
     },
     "aerobic_cognition": {
-        "short": "Aerobic Exercise and Neurocognitive Performance — Smith et al.",
-        "display": "Aerobic Exercise and Neurocognitive Performance — Smith et al.",
-        "full": (
-            "Smith PJ, Blumenthal JA, Hoffman BM, et al. Aerobic exercise and "
-            "neurocognitive performance: a meta-analytic review of randomized controlled "
-            "trials. Psychosomatic Medicine. 2010;72(3):239-252."
-        ),
-        "doi": "10.1097/PSY.0b013e3181d14633",
-        "url": "https://doi.org/10.1097/PSY.0b013e3181d14633",
+        "short": "Smith — Aerobic Exercise and Neurocognitive Performance",
+        "display": "Smith — Aerobic Exercise and Neurocognitive Performance",
         "peer_reviewed": True,
     },
     "mediterranean_cognition": {
-        "short": "Mediterranean Diet Improves Cognition — Martinez-Lapiscina et al.",
-        "display": "Mediterranean Diet Improves Cognition — Martinez-Lapiscina et al.",
-        "full": (
-            "Martinez-Lapiscina EH, Clavero P, Toledo E, et al. Mediterranean diet "
-            "improves cognition: the PREDIMED-NAVARRA randomised trial. Journal of "
-            "Neurology, Neurosurgery & Psychiatry. 2013;84(12):1318-1325."
-        ),
-        "doi": "10.1136/jnnp-2012-304792",
-        "url": "https://doi.org/10.1136/jnnp-2012-304792",
+        "short": "Martinez-Lapiscina — Mediterranean Diet Improves Cognition",
+        "display": "Martinez-Lapiscina — Mediterranean Diet Improves Cognition",
         "peer_reviewed": True,
     },
 }
@@ -119,7 +78,7 @@ def _make(
         "score": score,
         "severity": _severity(score),
         "trigger": (
-            "No score recorded yet"
+            "Completed check-in"
             if score is None
             else f"{category.replace('_', ' ').title()} score {score:.1f}/100"
         ),
@@ -134,16 +93,9 @@ def generate_interventions(
     categories: list[dict[str, Any]],
     profile: dict[str, Any] | None = None,
 ) -> list[Intervention]:
-    """Return practical, non-medication ideas matched to the latest scores.
-
-    Conservative thresholding is intentional: this is a family wellness product,
-    so recommendations stay small, behavior-based, and non-diagnostic.
-    """
+    """Return short, practical, cited, non-medication ideas matched to scores."""
     if not categories:
         return []
-
-    profile = profile or {}
-    name = profile.get("display_name") or "your parent"
 
     cognitive = _find_category(categories, "cognitive_speed")
     mobility = _find_category(categories, "mobility")
@@ -161,16 +113,9 @@ def generate_interventions(
                 id="daily-comfortable-walk",
                 category="mobility",
                 score=mobility_score,
-                title="Walk around the block once a day",
-                suggestion=(
-                    "Start with one comfortable walk around the block, or 5-10 minutes if a "
-                    "full block is too much. Keep the pace conversational and build gradually."
-                ),
-                rationale=(
-                    "The LIFE randomized trial used structured physical activity centered on "
-                    "walking, strength, balance, and flexibility to reduce major mobility "
-                    "disability in sedentary older adults."
-                ),
+                title="Daily short walk",
+                suggestion="Walk 5-10 minutes at an easy pace.",
+                rationale="Supports mobility.",
                 citation_key="life_physical_activity",
             )
         )
@@ -181,16 +126,9 @@ def generate_interventions(
                 id="sit-to-stand-mini-set",
                 category="strength_stability",
                 score=strength_score,
-                title="Do a tiny sit-to-stand set after breakfast",
-                suggestion=(
-                    "Try 5 slow sit-to-stands from a sturdy chair after breakfast, using hands "
-                    "for support if needed. Stop if there is pain, dizziness, or unsafe balance."
-                ),
-                rationale=(
-                    "Exercise programs that challenge balance and functional strength reduce "
-                    "falls in older adults; sit-to-stand practice is a simple home version of "
-                    "functional lower-body strengthening."
-                ),
+                title="Five chair stands",
+                suggestion="Do 5 slow stands from a sturdy chair.",
+                rationale="Builds leg strength and balance.",
                 citation_key="falls_exercise",
             )
         )
@@ -201,17 +139,9 @@ def generate_interventions(
                 id="protein-at-each-meal",
                 category="strength_stability",
                 score=strength_score,
-                title="Add a protein anchor to each meal",
-                suggestion=(
-                    "Include a palm-sized protein source at breakfast, lunch, and dinner - for "
-                    "example eggs, yogurt, tofu, beans, fish, chicken, or lentils. Ask a clinician "
-                    "first if kidney disease or a protein restriction is present."
-                ),
-                rationale=(
-                    "The PROT-AGE position paper recommends attention to higher-quality, "
-                    "adequately distributed protein intake in older adults to support muscle "
-                    "maintenance and function."
-                ),
+                title="Protein with meals",
+                suggestion="Add eggs, yogurt, beans, tofu, fish, or chicken.",
+                rationale="Supports muscle maintenance.",
                 citation_key="protein_older_adults",
             )
         )
@@ -222,17 +152,9 @@ def generate_interventions(
                 id="walk-plus-brain-game",
                 category="cognitive_speed",
                 score=cognitive_score,
-                title="Pair a short walk with a light brain game",
-                suggestion=(
-                    "Do a 10-minute easy walk, then a simple mentally engaging activity like a "
-                    "card game, word game, or recalling a family story together. Keep it playful, "
-                    "not like a test."
-                ),
-                rationale=(
-                    "A meta-analysis of randomized trials found aerobic exercise was associated "
-                    "with improvements in neurocognitive performance, supporting gentle movement "
-                    "as a cognitive-motor habit."
-                ),
+                title="Walk + brain game",
+                suggestion="Take a short walk, then play a simple word or card game.",
+                rationale="Pairs movement with cognitive practice.",
                 citation_key="aerobic_cognition",
             )
         )
@@ -243,37 +165,24 @@ def generate_interventions(
                 id="mediterranean-plate-swap",
                 category="cognitive_speed",
                 score=cognitive_score,
-                title="Make one Mediterranean-style plate swap",
-                suggestion=(
-                    "Once per day, make the meal more Mediterranean-style: vegetables or fruit, "
-                    "beans or whole grains, nuts or olive oil, and fish/lean protein when possible."
-                ),
-                rationale=(
-                    "The PREDIMED-NAVARRA randomized trial reported cognitive benefits from a "
-                    "Mediterranean dietary pattern in older adults at cardiovascular risk."
-                ),
+                title="Mediterranean plate swap",
+                suggestion="Add vegetables, beans, nuts, olive oil, or fish once daily.",
+                rationale="Supports cognitive health.",
                 citation_key="mediterranean_cognition",
             )
         )
 
     if not ideas:
-        avg_score = sum(float(c["score"]) for c in categories if c.get("score") is not None) / len(categories)
+        scored = [float(c["score"]) for c in categories if c.get("score") is not None]
+        avg_score = sum(scored) / max(1, len(scored))
         ideas.append(
             _make(
-                id="maintenance-walk-strength-rhythm",
+                id="daily-walk-and-stand-routine",
                 category="overall",
                 score=avg_score,
-                title="Keep a weekly movement rhythm",
-                suggestion=(
-                    f"Because {name}'s current scores look steady, keep the habit simple: "
-                    "walk most days and do a short strength/balance routine two or three times "
-                    "per week."
-                ),
-                rationale=(
-                    "Structured physical activity programs emphasizing walking plus strength, "
-                    "balance, and flexibility have randomized-trial evidence for preserving "
-                    "mobility in older adults."
-                ),
+                title="Walk + stand routine",
+                suggestion="Walk most days; add 5 chair stands a few times weekly.",
+                rationale="Helps maintain mobility.",
                 citation_key="life_physical_activity",
             )
         )
