@@ -45,8 +45,8 @@ export default function VideoWalk({ embedded, onSaved }: Props = {}) {
     <Tag className={embedded ? "" : "card"}>
       <h2>Video — walking gait</h2>
       <p className="muted">
-        Record 10–15 seconds with the full body visible (side view works best). Computer vision
-        estimates speed, cadence, and symmetry, then scores against age norms.
+        Record 10–15 seconds of steady walking across the frame (side view works best). We
+        only need clear sideways walking — step motion is not treated as chair stands.
       </p>
       <label className="field-label">Distance walked in video (meters)</label>
       <input

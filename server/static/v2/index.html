@@ -1,0 +1,486 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Longevity App v2</title>
+<link href="https://fonts.googleapis.com/css2?family=Lora:ital,wght@0,400;0,500;0,600;1,400&family=DM+Sans:wght@300;400;500&display=swap" rel="stylesheet">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.js"></script>
+<link rel="stylesheet" href="/v2/v2.css">
+</head>
+<body>
+<div id="buildTag" class="build-tag" aria-hidden="true"></div>
+<div class="phone-frame">
+
+<!-- ONBOARDING -->
+<div class="screen active" id="onboarding">
+  <div class="ob-slides">
+    <div class="ob-slide active" id="ob0">
+      <div class="ob-icon">
+        <svg width="46" height="46" viewBox="0 0 46 46" fill="none">
+          <path d="M23 7C23 7 9 15 9 29C9 37 15 43 23 43C31 43 37 37 37 29C37 15 23 7 23 7Z" fill="#6B8F71"/>
+          <path d="M23 7C23 7 23 21 17 33" stroke="#4A6B51" stroke-width="2" stroke-linecap="round"/>
+        </svg>
+      </div>
+      <h2>Welcome to your parent's Longevity Journal</h2>
+      <p>Track the health signals that matter most for your parent's long-term wellbeing — from how they walk to how they sleep — in one warm, honest place.</p>
+    </div>
+    <div class="ob-slide" id="ob1">
+      <div class="ob-icon">
+        <svg width="46" height="46" viewBox="0 0 46 46" fill="none">
+          <circle cx="23" cy="23" r="17" stroke="#6B8F71" stroke-width="2.5"/>
+          <polyline points="15,23 20,28 31,17" stroke="#A8C5AD" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/>
+        </svg>
+      </div>
+      <h2>Simple check-ins, powerful insights</h2>
+      <p>Short weekly tests — walking pace, sit & stand, reaction time — take under 5 minutes together and reveal patterns no single doctor visit could capture.</p>
+    </div>
+    <div class="ob-slide" id="ob2">
+      <div class="ob-icon">
+        <svg width="46" height="46" viewBox="0 0 46 46" fill="none">
+          <rect x="8" y="13" width="30" height="22" rx="4" stroke="#6B8F71" stroke-width="2.5"/>
+          <polyline points="15,25 20,20 26,26 31,21" stroke="#A8C5AD" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/>
+        </svg>
+      </div>
+      <h2>Every Sunday, a digest just for you</h2>
+      <p>Get a plain-English summary of what changed this week, what's going well, and one gentle suggestion — written for you, not a clinician.</p>
+    </div>
+    <div class="ob-slide" id="ob3">
+      <div class="ob-icon">
+        <svg width="46" height="46" viewBox="0 0 46 46" fill="none">
+          <path d="M23 9L27.5 18L38 19.5L30.5 26.5L32.5 37L23 32L13.5 37L15.5 26.5L8 19.5L18.5 18L23 9Z" fill="#C9A84C" opacity="0.85"/>
+        </svg>
+      </div>
+      <h2>Let's do your first test together</h2>
+      <p>We'll start with the Sit & Stand test. Grab a chair — it takes 90 seconds and immediately tells us something meaningful about <span id="obParentHint">your parent's</span> strength.</p>
+    </div>
+  </div>
+  <div class="ob-dots">
+    <div class="ob-dot active" onclick="goSlide(0)"></div>
+    <div class="ob-dot" onclick="goSlide(1)"></div>
+    <div class="ob-dot" onclick="goSlide(2)"></div>
+    <div class="ob-dot" onclick="goSlide(3)"></div>
+  </div>
+  <div class="ob-footer">
+    <button class="ob-primary" id="obBtn" onclick="obNext()">Next</button>
+    <button class="ob-ghost" onclick="skipOnboarding()">Skip intro</button>
+  </div>
+</div>
+
+<!-- SPLASH -->
+<div class="screen" id="splash" onclick="goTo('journal-select')">
+  <svg class="trees-bg" viewBox="0 0 390 460" preserveAspectRatio="xMidYMax meet">
+    <g fill="#4A6B51" opacity="0.44"><polygon points="195,80 240,200 150,200"/><polygon points="195,120 250,220 140,220"/><rect x="188" y="218" width="14" height="40"/></g>
+    <g fill="#4A6B51" opacity="0.36"><polygon points="60,120 110,240 10,240"/><polygon points="60,155 120,255 0,255"/><rect x="53" y="253" width="14" height="50"/></g>
+    <g fill="#4A6B51" opacity="0.36"><polygon points="330,130 380,250 280,250"/><polygon points="330,165 385,265 275,265"/><rect x="323" y="263" width="14" height="50"/></g>
+    <g fill="#3A5A41" opacity="0.55"><polygon points="100,180 160,320 40,320"/><polygon points="100,220 170,340 30,340"/><rect x="93" y="338" width="14" height="60"/></g>
+    <g fill="#3A5A41" opacity="0.55"><polygon points="290,170 350,310 230,310"/><polygon points="290,210 360,330 220,330"/><rect x="283" y="328" width="14" height="60"/></g>
+    <g fill="#2C4831" opacity="0.68"><polygon points="195,230 280,400 110,400"/><polygon points="195,280 295,430 95,430"/><rect x="188" y="428" width="16" height="60"/></g>
+    <rect x="0" y="420" width="390" height="40" fill="#2C4831" opacity="0.68"/>
+  </svg>
+  <div class="splash-content">
+    <h1>Welcome Back!<br><span data-caregiver-name>Sarah</span></h1>
+    <p id="splashSub">Journal is waiting</p>
+  </div>
+  <div class="splash-tap pulse">
+    Tap anywhere to continue
+    <small id="splashLastCheckin">Last check-in: —</small>
+  </div>
+</div>
+
+<!-- JOURNAL SELECT -->
+<div class="screen" id="journal-select">
+  <div class="journal-header">
+    <h1>Welcome Back!<br><span data-caregiver-name>Sarah</span></h1>
+    <p>Select a Longevity Journal to continue</p>
+  </div>
+  <div class="carousel-area" id="journalCarousel"></div>
+  <div class="carousel-dots">
+    <div class="dot"></div><div class="dot active"></div><div class="dot"></div>
+  </div>
+</div>
+
+<!-- DASHBOARD -->
+<div class="screen" id="dashboard">
+  <div class="screen-scroll">
+    <div class="dash-header">
+      <div class="dash-avatar">
+        <svg class="leaf" viewBox="0 0 36 36" fill="none"><path d="M18 6C18 6 8 12 8 22C8 28 13 32 18 32C23 32 28 28 28 22C28 12 18 6 18 6Z" fill="#A8C5AD"/><path d="M18 6C18 6 18 16 14 24" stroke="#6B8F71" stroke-width="1.5" stroke-linecap="round"/></svg>
+      </div>
+      <div class="dash-name" data-parent-name>Robert Chen</div>
+      <div class="daily-msg" id="dailyMsg">"Great job on last week's walk — 3 days in a row!"</div>
+    </div>
+    <div class="action-tiles">
+      <button class="tile blue" onclick="goTo('tests')">
+        <div class="tile-icon"><svg width="19" height="19" viewBox="0 0 20 20" fill="none"><circle cx="10" cy="10" r="8" stroke="white" stroke-width="1.5"/><line x1="10" y1="6" x2="10" y2="14" stroke="white" stroke-width="1.5" stroke-linecap="round"/><line x1="6" y1="10" x2="14" y2="10" stroke="white" stroke-width="1.5" stroke-linecap="round"/></svg></div>
+        <span>New Test</span>
+      </button>
+      <button class="tile green" onclick="openTasks()">
+        <div class="tile-icon"><svg width="19" height="19" viewBox="0 0 20 20" fill="none"><polyline points="4,10 8,14 16,6" stroke="white" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg></div>
+        <span>View Tasks</span>
+      </button>
+      <button class="tile terra" onclick="goTo('graphs')">
+        <div class="tile-icon"><svg width="19" height="19" viewBox="0 0 20 20" fill="none"><rect x="3" y="11" width="3" height="6" rx="1" fill="white"/><rect x="8.5" y="7" width="3" height="10" rx="1" fill="white"/><rect x="14" y="4" width="3" height="13" rx="1" fill="white"/></svg></div>
+        <span>Progress</span>
+      </button>
+    </div>
+
+    <div class="digest-banner" onclick="goTo('weekly-digest')">
+      <div class="db-row">
+        <div class="db-icon"><svg width="19" height="19" viewBox="0 0 20 20" fill="none"><rect x="3" y="3" width="14" height="14" rx="3" stroke="white" stroke-width="1.5"/><line x1="6" y1="7" x2="14" y2="7" stroke="white" stroke-width="1.2" stroke-linecap="round"/><line x1="6" y1="10" x2="12" y2="10" stroke="white" stroke-width="1.2" stroke-linecap="round"/><line x1="6" y1="13" x2="10" y2="13" stroke="white" stroke-width="1.2" stroke-linecap="round"/></svg></div>
+        <div class="db-text"><h4>This week's digest is ready</h4><p>Sunday · Robert had a strong week</p></div>
+        <div class="db-arrow">›</div>
+      </div>
+    </div>
+
+    <div class="milestone-strip" onclick="showMilestone()">
+      <div class="ms-star">🌟</div>
+      <div class="ms-text"><h4 id="msStripTitle">Celebrate your check-ins!</h4><p>Tap to celebrate and share</p></div>
+      <button class="ms-share">Share</button>
+    </div>
+
+    <div class="longevity-card">
+      <div class="lc-top">
+        <div><div class="lc-title">Longevity Summary</div><div class="lc-desc" id="lcDesc">Run a check-in to see your summary.</div></div>
+        <div class="ring-wrap">
+          <canvas id="ringChart" width="76" height="76" role="img" aria-label="Longevity score"></canvas>
+          <div class="ring-pct" id="ringPct">—</div>
+        </div>
+      </div>
+      <div class="lc-lines" id="lcLines"><div class="lc-line"></div><div class="lc-line"></div><div class="lc-line"></div></div>
+      <div class="btn-row">
+        <button class="sm-btn" onclick="goTo('graphs')">See graphs</button>
+        <button class="sm-btn" onclick="goTo('doctor-export')">Doctor export</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="tasks-overlay" id="tasksOverlay" onclick="closeTasks()">
+    <div class="tasks-sheet" id="tasksSheet" onclick="event.stopPropagation()">
+      <div class="sheet-handle"></div>
+      <h2>Action plan</h2>
+      <div class="streak-pill">Evidence-based habits from your check-ins</div>
+      <ul id="taskList" class="task-list-api"></ul>
+    </div>
+  </div>
+
+  <div class="milestone-overlay" id="msOverlay" onclick="closeMilestone()">
+    <div class="milestone-modal" onclick="event.stopPropagation()">
+      <div class="ms-rainbow"></div>
+      <div id="confArea"></div>
+      <span class="ms-emoji">🌱</span>
+      <h2>30 Check-ins!</h2>
+      <p>Robert has logged 30 consistent check-ins. That's 30 data points building a picture of his health that no single visit could capture.</p>
+      <div class="ms-stat"><div class="ms-big">30</div><div class="ms-big-lbl">check-ins logged together</div></div>
+      <button class="ms-share-btn" onclick="closeMilestone();t('toastDash','Share card copied!')">Share this milestone</button>
+      <button class="ms-dismiss" onclick="closeMilestone()">Dismiss</button>
+    </div>
+  </div>
+
+  <div class="nav-bar">
+    <button class="nav-item active" data-nav="dashboard" onclick="goTo('dashboard')"><svg width="19" height="19" viewBox="0 0 22 22" fill="none"><rect x="3" y="3" width="7" height="7" rx="2" stroke="currentColor" stroke-width="1.5"/><rect x="12" y="3" width="7" height="7" rx="2" stroke="currentColor" stroke-width="1.5"/><rect x="3" y="12" width="7" height="7" rx="2" stroke="currentColor" stroke-width="1.5"/><rect x="12" y="12" width="7" height="7" rx="2" stroke="currentColor" stroke-width="1.5"/></svg><span>Home</span></button>
+    <button class="nav-item" data-nav="tests" onclick="goTo('tests')"><svg width="19" height="19" viewBox="0 0 22 22" fill="none"><circle cx="11" cy="11" r="8" stroke="currentColor" stroke-width="1.5"/><line x1="11" y1="7" x2="11" y2="15" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/><line x1="7" y1="11" x2="15" y2="11" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg><span>Tests</span></button>
+    <button class="nav-item" data-nav="graphs" onclick="goTo('graphs')"><svg width="19" height="19" viewBox="0 0 22 22" fill="none"><polyline points="3,16 8,10 12,13 19,6" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg><span>Progress</span></button>
+  </div>
+  <div class="toast" id="toastDash"></div>
+</div>
+
+<!-- TESTS -->
+<div class="screen" id="tests">
+  <div class="tests-header">
+    <div class="tests-avatar"><svg class="leaf" viewBox="0 0 36 36" fill="none"><path d="M18 6C18 6 8 12 8 22C8 28 13 32 18 32C23 32 28 28 28 22C28 12 18 6 18 6Z" fill="#A8C5AD"/><path d="M18 6C18 6 18 16 14 24" stroke="#6B8F71" stroke-width="1.5" stroke-linecap="round"/></svg></div>
+    <div class="tests-name" data-parent-name>Robert Chen</div>
+    <div class="tests-sub" id="testsSub">The first steps of their Longevity Journey</div>
+  </div>
+  <div class="tests-scroll">
+  <div class="test-tiles">
+    <div class="test-tile t-blue" onclick="goTo('walk')"><div class="ttile-hdr">Walking Pace ›</div><div class="ttile-body">Time a normal 10-foot walk</div></div>
+    <div class="test-tile t-terra" onclick="goTo('sit-stand')"><div class="ttile-hdr">Sit &amp; Stand ›</div><div class="ttile-body">30-second CDC rep count</div></div>
+    <div class="test-tile t-green" onclick="goTo('reaction')"><div class="ttile-hdr">Reaction Time ›</div><div class="ttile-body">Tap when the screen turns green</div></div>
+    <div class="test-tile t-dark" onclick="goTo('guided')"><div class="ttile-hdr">Full check-in ›</div><div class="ttile-body">Guided workflow + video analysis</div></div>
+    <div class="test-tile t-sage" onclick="goTo('chair-rise')"><div class="ttile-hdr">Quick stand ›</div><div class="ttile-body">Single sit-to-stand timer</div></div>
+  </div>
+  </div>
+  <div class="nav-bar">
+    <button class="nav-item" data-nav="dashboard" onclick="goTo('dashboard')"><svg width="19" height="19" viewBox="0 0 22 22" fill="none"><rect x="3" y="3" width="7" height="7" rx="2" stroke="currentColor" stroke-width="1.5"/><rect x="12" y="3" width="7" height="7" rx="2" stroke="currentColor" stroke-width="1.5"/><rect x="3" y="12" width="7" height="7" rx="2" stroke="currentColor" stroke-width="1.5"/><rect x="12" y="12" width="7" height="7" rx="2" stroke="currentColor" stroke-width="1.5"/></svg><span>Home</span></button>
+    <button class="nav-item active" data-nav="tests" onclick="goTo('tests')"><svg width="19" height="19" viewBox="0 0 22 22" fill="none"><circle cx="11" cy="11" r="8" stroke="currentColor" stroke-width="1.5"/><line x1="11" y1="7" x2="11" y2="15" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/><line x1="7" y1="11" x2="15" y2="11" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg><span>Tests</span></button>
+    <button class="nav-item" data-nav="graphs" onclick="goTo('graphs')"><svg width="19" height="19" viewBox="0 0 22 22" fill="none"><polyline points="3,16 8,10 12,13 19,6" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg><span>Progress</span></button>
+  </div>
+  <div class="toast" id="toast2"></div>
+</div>
+
+<!-- SIT & STAND -->
+<div class="screen" id="sit-stand">
+  <div class="test-header">
+    <button class="back-btn" onclick="goTo('tests')">← Back</button>
+    <h2>Sit &amp; Stand</h2>
+    <p>30 seconds · Count reps · Rate effort</p>
+  </div>
+  <div class="ss-body">
+    <div id="ssReady" class="ss-phase show">
+      <div class="ss-timer-card">
+        <div class="ss-get-ready">Get ready</div>
+        <div class="ss-timer" id="ssTimer">30</div>
+        <div class="ss-timer-lbl">seconds</div>
+        <div class="ss-reps-big" id="ssRepsD">0</div>
+        <div class="ss-reps-lbl">reps</div>
+      </div>
+      <div class="ss-btn-grid"><button class="ss-btn start" onclick="startSS()">Start Test</button></div>
+      <div class="info-box"><strong class="title">How it works</strong>Sit fully in a chair, arms crossed. When you tap Start, stand fully and sit back down as many times as possible in 30 seconds. Tap <strong class="rep-hl">Count Rep</strong> each time.</div>
+    </div>
+    <div id="ssRunning" class="ss-phase">
+      <div class="ss-timer-card">
+        <div class="ss-in-progress">Test in progress</div>
+        <div class="ss-timer" id="ssTimerR">30</div>
+        <div class="ss-timer-lbl">seconds remaining</div>
+        <div class="ss-reps-big" id="ssRepsR">0</div>
+        <div class="ss-reps-lbl">reps</div>
+      </div>
+      <div class="ss-btn-grid">
+        <button class="ss-btn rep" onclick="countRep()">+ Count Rep</button>
+        <button class="ss-btn undo" onclick="undoRep()">Undo</button>
+        <button class="ss-btn finish" onclick="finishSS()">Finish Early</button>
+      </div>
+    </div>
+    <div id="ssEffort" class="ss-phase">
+      <div class="ss-complete-card">
+        <div class="ss-complete-title">Test complete!</div>
+        <div class="ss-complete-sub" id="ssCompleteSub">Completed <span id="finalReps" class="rep-count">0</span> reps in 30 seconds</div>
+      </div>
+      <div class="effort-card">
+        <h3>How hard did that feel?</h3>
+        <p>Helps us calibrate results. A good score on an easy day means something different than the same score when tired.</p>
+        <div class="effort-scale">
+          <button class="eff-btn" onclick="selEff(this,1)">1</button>
+          <button class="eff-btn" onclick="selEff(this,2)">2</button>
+          <button class="eff-btn" onclick="selEff(this,3)">3</button>
+          <button class="eff-btn" onclick="selEff(this,4)">4</button>
+          <button class="eff-btn" onclick="selEff(this,5)">5</button>
+        </div>
+        <div class="eff-labels"><span>Very easy</span><span>Moderate</span><span>Max effort</span></div>
+      </div>
+      <div class="context-card">
+        <h3>Any context to add?</h3>
+        <div class="ctx-tags">
+          <button class="ctx-tag" onclick="this.classList.toggle('sel')">Just woke up</button>
+          <button class="ctx-tag" onclick="this.classList.toggle('sel')">After a walk</button>
+          <button class="ctx-tag" onclick="this.classList.toggle('sel')">Feeling tired</button>
+          <button class="ctx-tag" onclick="this.classList.toggle('sel')">Feeling good</button>
+          <button class="ctx-tag" onclick="this.classList.toggle('sel')">Mild pain</button>
+          <button class="ctx-tag" onclick="this.classList.toggle('sel')">After meds</button>
+        </div>
+      </div>
+      <button class="ss-btn finish ss-see-results" onclick="showChairRepsResult()">See Results →</button>
+    </div>
+    <div id="ssResult" class="ss-phase">
+      <div class="result-card">
+        <div class="ss-result-title" id="ssResultTitle">Result</div>
+        <div class="res-nums">
+          <div class="r-num"><div class="r-val" id="resScore">—</div><div class="r-lbl">Score</div></div>
+          <div class="r-num"><div class="r-val" id="resReps">0</div><div class="r-lbl">Reps</div></div>
+          <div class="r-num"><div class="r-val" id="resEffort">—</div><div class="r-lbl">Effort</div></div>
+        </div>
+        <div class="norm-wrap">
+          <div class="norm-labels-top"><span>Age-group range (70–75)</span><span>Robert ↑</span></div>
+          <div class="norm-track"><div class="norm-fill"></div><div class="norm-marker"></div></div>
+          <div class="norm-labels-bot"><span>6 reps</span><span>Avg: 10</span><span>16 reps</span></div>
+        </div>
+        <div class="res-insight" id="resInsight"></div>
+        <button class="ss-btn finish ss-back-dash" onclick="goTo('dashboard')">Back to Dashboard</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- WEEKLY DIGEST -->
+<div class="screen" id="weekly-digest">
+  <div class="screen-scroll-pad">
+    <div class="digest-header">
+      <button class="back-btn" onclick="goTo('dashboard')">← Back</button>
+      <h2>This Week's Digest</h2>
+      <p id="digestHeaderSub">Weekly digest</p>
+    </div>
+    <div class="digest-body">
+      <div class="digest-intro" id="digestIntro"></div>
+      <div class="d-stat-row">
+        <div class="d-stat"><div class="d-stat-icon">🚶</div><div class="d-stat-val" id="dWalk">—</div><div class="d-stat-lbl">Mobility</div><div class="d-stat-delta up" id="dWalkDelta"></div></div>
+        <div class="d-stat"><div class="d-stat-icon">🪑</div><div class="d-stat-val" id="dChair">—</div><div class="d-stat-lbl">Strength</div><div class="d-stat-delta up" id="dChairDelta"></div></div>
+        <div class="d-stat"><div class="d-stat-icon">✅</div><div class="d-stat-val" id="dCheckins">0</div><div class="d-stat-lbl">Check-ins</div><div class="d-stat-delta steady" id="dCheckinsDelta"></div></div>
+      </div>
+      <div class="sec-label">What we noticed</div>
+      <div id="digestInsights"></div>
+      <div class="sec-label">One thing to try</div>
+      <div class="action-item">
+        <div class="action-icon"><svg width="17" height="17" viewBox="0 0 18 18" fill="none"><path d="M9 3C9 3 4 6.5 4 11C4 13.8 6.2 16 9 16C11.8 16 14 13.8 14 11C14 6.5 9 3 9 3Z" fill="white" opacity="0.85"/></svg></div>
+        <div class="action-text" id="digestAction">Complete a check-in to get a personalized suggestion.</div>
+      </div>
+      <button class="share-btn-full" onclick="t('toast3','Digest shared with siblings!')">Share digest with family</button>
+    </div>
+  </div>
+  <div class="toast" id="toast3"></div>
+</div>
+
+<!-- DOCTOR EXPORT -->
+<div class="screen" id="doctor-export">
+  <div class="screen-scroll-pad">
+    <div class="export-header">
+      <button class="back-btn" onclick="goTo('dashboard')">← Back</button>
+      <h2>Doctor Visit Export</h2>
+      <p>One-page clinical summary for appointments</p>
+    </div>
+    <div class="export-body">
+      <div class="export-preview" id="exportPreview"></div>
+      <div class="sec-label export-sec-label">Export options</div>
+      <div class="export-toggle-row"><div><div class="etr-label">Include trend charts</div><div class="etr-sub">Adds 6-month graphs to export</div></div><div class="toggle on" onclick="this.classList.toggle('on');this.classList.toggle('off')"></div></div>
+      <div class="export-toggle-row"><div><div class="etr-label">Include caregiver notes</div><div class="etr-sub">All observations from last 90 days</div></div><div class="toggle on" onclick="this.classList.toggle('on');this.classList.toggle('off')"></div></div>
+      <div class="export-toggle-row"><div><div class="etr-label">Include medication log</div><div class="etr-sub">Medications and adherence record</div></div><div class="toggle off" onclick="this.classList.toggle('on');this.classList.toggle('off')"></div></div>
+      <button class="export-btn primary" onclick="t('toast4','PDF generated! Ready to share.')">Generate PDF</button>
+      <button class="export-btn secondary" onclick="t('toast4','Email sent to Dr. Park!')">Email to doctor</button>
+    </div>
+  </div>
+  <div class="toast" id="toast4"></div>
+</div>
+
+<!-- GRAPHS -->
+<div class="screen" id="graphs">
+  <div class="screen-scroll">
+    <div class="graphs-header">
+      <button class="back-btn" onclick="goTo('dashboard')">← Back</button>
+      <h2>Robert's Progress</h2>
+      <p>Updated today · 6 months tracked</p>
+    </div>
+    <div class="graph-section">
+      <div class="graph-card">
+        <h3>Vitality Score</h3>
+        <p class="g-sub">6-month trend</p>
+        <div class="metric-trio">
+          <div class="m-card"><div class="m-label">This week</div><div class="m-val">74</div><div class="m-delta up">+3 ↑</div></div>
+          <div class="m-card"><div class="m-label">Year best</div><div class="m-val">81</div><div class="m-delta muted">Mar</div></div>
+          <div class="m-card"><div class="m-label">6-mo change</div><div class="m-val">+9</div><div class="m-delta up">improving</div></div>
+        </div>
+        <div class="vitality-chart-wrap"><canvas id="vitalityChart" role="img" aria-label="Vitality score chart Nov to Apr">Nov 65 Dec 67 Jan 63 Feb 69 Mar 81 Apr 74.</canvas></div>
+      </div>
+      <div class="graph-card">
+        <h3>Biological Age Estimate</h3>
+        <p class="g-sub">Based on 6 months of tracked signals</p>
+        <div class="bio-age-wrap">
+          <div class="age-block"><div class="age-num actual" id="bioActual">—</div><div class="age-label">Actual age</div></div>
+          <div class="vs-sep">vs</div>
+          <div class="age-block"><div class="age-num bio" id="bioEst">—</div><div class="age-label">Functional age</div></div>
+        </div>
+        <div class="bio-exp" id="bioExpText">Complete check-ins to see functional age estimate.</div>
+        <div class="prog-label"><span>Started at 71 bio age</span><span>Goal: 65</span></div>
+        <div class="prog-track"><div class="prog-fill" id="bioFill"></div></div>
+      </div>
+    </div>
+    <div class="bottom-pad"></div>
+  </div>
+  <div class="nav-bar">
+    <button class="nav-item" data-nav="dashboard" onclick="goTo('dashboard')"><svg width="19" height="19" viewBox="0 0 22 22" fill="none"><rect x="3" y="3" width="7" height="7" rx="2" stroke="currentColor" stroke-width="1.5"/><rect x="12" y="3" width="7" height="7" rx="2" stroke="currentColor" stroke-width="1.5"/><rect x="3" y="12" width="7" height="7" rx="2" stroke="currentColor" stroke-width="1.5"/><rect x="12" y="12" width="7" height="7" rx="2" stroke="currentColor" stroke-width="1.5"/></svg><span>Home</span></button>
+    <button class="nav-item" data-nav="tests" onclick="goTo('tests')"><svg width="19" height="19" viewBox="0 0 22 22" fill="none"><circle cx="11" cy="11" r="8" stroke="currentColor" stroke-width="1.5"/><line x1="11" y1="7" x2="11" y2="15" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/><line x1="7" y1="11" x2="15" y2="11" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg><span>Tests</span></button>
+    <button class="nav-item active" data-nav="graphs" onclick="goTo('graphs')"><svg width="19" height="19" viewBox="0 0 22 22" fill="none"><polyline points="3,16 8,10 12,13 19,6" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg><span>Progress</span></button>
+  </div>
+</div>
+
+<!-- WALK -->
+<div class="screen" id="walk">
+  <div class="test-header header-slate">
+    <button class="back-btn" onclick="goTo('tests')">← Back</button>
+    <h2>Walking Pace</h2>
+    <p>10-foot walk · comfortable pace</p>
+  </div>
+  <div class="ss-body">
+    <div class="ss-timer-card">
+      <div class="ss-timer timer-slate" id="walkTimer">—</div>
+      <div class="ss-timer-lbl">seconds</div>
+    </div>
+    <div class="ss-btn-grid">
+      <button type="button" class="ss-btn start btn-sage" id="walkStart">Start</button>
+      <button type="button" class="ss-btn undo" id="walkStop">Stop</button>
+      <button type="button" class="ss-btn undo" id="walkReset">Reset</button>
+    </div>
+    <label class="field-label">Or enter seconds</label>
+    <input class="field-input" id="walkSec" type="number" step="0.1" min="1" placeholder="e.g. 4.2" />
+    <button type="button" class="ss-btn finish btn-slate-full" id="saveWalk">Save walk</button>
+    <div class="api-result" id="walkOut"></div>
+  </div>
+</div>
+
+<!-- REACTION -->
+<div class="screen" id="reaction">
+  <div class="test-header header-sage">
+    <button class="back-btn" onclick="goTo('tests')">← Back</button>
+    <h2>Reaction Time</h2>
+    <p>5 trials · tap when green</p>
+  </div>
+  <div class="ss-body">
+    <div id="reactPad" class="react-pad wait">Tap to start</div>
+    <p class="react-trials-line" id="reactTrialsLine"></p>
+    <button type="button" class="ss-btn finish btn-sage-full" id="saveReact" disabled>Save results</button>
+    <button type="button" class="ss-btn undo" id="reactRedo">Redo test</button>
+    <div class="api-result" id="reactOut"></div>
+  </div>
+</div>
+
+<!-- CHAIR RISE (single stand) -->
+<div class="screen" id="chair-rise">
+  <div class="test-header">
+    <button class="back-btn" onclick="goTo('tests')">← Back</button>
+    <h2>Quick Sit &amp; Stand</h2>
+    <p>One rise · time upward phase</p>
+  </div>
+  <div class="ss-body">
+    <div class="ss-timer-card">
+      <div class="ss-timer" id="crTimer">—</div>
+      <div class="ss-timer-lbl">rise time (seconds)</div>
+    </div>
+    <div class="ss-btn-grid">
+      <button type="button" class="ss-btn start" id="crStart">Start stand</button>
+      <button type="button" class="ss-btn undo" id="crStop" disabled>Finish</button>
+      <button type="button" class="ss-btn undo" id="crReset">Reset</button>
+    </div>
+    <button type="button" class="ss-btn finish" id="saveChairRise" disabled>Save chair test</button>
+    <div class="api-result" id="crOut"></div>
+    <p class="info-box info-box-link">For CDC 30-second rep count, use <a href="#" onclick="goTo('sit-stand');return false">Sit &amp; Stand (30s)</a>.</p>
+  </div>
+</div>
+
+<!-- PROFILE -->
+<div class="screen" id="profile">
+  <div class="test-header header-charcoal">
+    <button class="back-btn" onclick="goTo('journal-select')">← Back</button>
+    <h2>Parent profile</h2>
+    <p>Age &amp; sex for fair norm comparison</p>
+  </div>
+  <div class="ss-body">
+    <label class="field-label">Your name (caregiver)</label>
+    <input class="field-input" id="caregiverName" placeholder="Sarah" />
+    <label class="field-label">Parent name</label>
+    <input class="field-input" id="profName" placeholder="Mom, Dad, etc." />
+    <label class="field-label">Age</label>
+    <input class="field-input" id="profAge" type="number" min="50" max="110" />
+    <label class="field-label">Sex (for norms)</label>
+    <select class="field-input" id="profSex"><option value="female">Female</option><option value="male">Male</option></select>
+    <button type="button" class="ss-btn finish btn-sage-full" id="saveProf">Save profile</button>
+    <div class="api-result" id="profOut"></div>
+  </div>
+</div>
+
+<!-- GUIDED / CLASSIC -->
+<div class="screen" id="guided">
+  <div class="test-header header-charcoal">
+    <button class="back-btn" onclick="goTo('tests')">← Back</button>
+    <h2>Full check-in</h2>
+    <p>Video + guided workflow</p>
+  </div>
+  <div class="guided-body">
+    <iframe id="guidedFrame" title="KinSpan guided check-in" src="about:blank"></iframe>
+    <button type="button" class="ss-btn undo guided-back" onclick="goTo('tests')">← Return to tests</button>
+  </div>
+</div>
+
+</div>
+
+<script src="/v2/kinspan-app.js"></script>
+</body>
+</html>

@@ -43,8 +43,8 @@ export default function VideoChair({ embedded, onSaved }: Props = {}) {
     <Tag className={embedded ? "" : "card"}>
       <h2>Video — chair stand</h2>
       <p className="muted">
-        Film about 30 seconds of sit-to-stand reps. Computer vision counts stands and scores leg
-        strength vs age norms (STEADI / Rikli &amp; Jones).
+        Film one sit-to-stand in place (~5–10 seconds). We measure how quick and smooth the rise is.
+        Walking clips are rejected.
       </p>
       <div className="video-wrap">
         <video src={preview ?? undefined} playsInline muted controls={!!preview} />
@@ -71,7 +71,10 @@ export default function VideoChair({ embedded, onSaved }: Props = {}) {
           <p>{scores.interpretation}</p>
           {cv && (
             <p className="muted">
-              CV counted ~{String(cv.reps_30s_est)} stands ({String(cv.method)})
+              Rise {String(cv.rise_time_seconds)}s · smoothness {String(
+                Math.round(Number(cv.smoothness_index) * 100)
+              )}
+              % ({String(cv.method)})
             </p>
           )}
           {!embedded && (

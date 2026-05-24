@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { Link } from "react-router-dom";
 import { saveGait, type CategoryScore } from "../api";
+import TestBack from "../components/TestBack";
 
 type WalkState = "idle" | "running" | "paused" | "stopped";
 
@@ -104,6 +105,7 @@ export default function WalkTest({ embedded, onSaved }: Props = {}) {
   const Tag = embedded ? "div" : "section";
   return (
     <Tag className={embedded ? "" : "card"}>
+      {!embedded && <TestBack />}
       <h2>Mobility — 10-foot walk</h2>
       <p className="muted">
         Mark 10 feet on the floor (3.05 m). Parent walks at a <strong>comfortable</strong> pace; time

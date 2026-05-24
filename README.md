@@ -85,6 +85,8 @@ In another terminal: open http://127.0.0.1:8000/api/health — should return `{"
 
 Choose your path at the top of the UI, then follow the **guided check-in** (stepper, Back/Continue) — each path has its own step order. For better pose tracking: `pip install -r requirements-cv.txt`
 
+**Chair-stand video** uses the MediaPipe **Pose Landmarker full** model (`pose_landmarker_full.task`, same stack as `workshop/walking`). It counts reps from **knee extension + hip rise**, not raw pixel motion alone. Walking CV is unchanged.
+
 ## Run locally (basic test UI — recommended)
 
 One command serves API + UI:
@@ -96,7 +98,9 @@ pip install -r requirements.txt
 uvicorn main:app --reload --port 8000
 ```
 
-Open **http://localhost:8000** — guided step-by-step check-in (built-in UI).
+Open **http://localhost:8000** — **new home screen** (Welcome → Journals → Tests → Dashboard).
+
+**Classic guided UI** (all tests + video): **http://localhost:8000/classic**
 
 **At-home path:** Profile → Reaction → Walk → Chair → Results  
 **Video path:** Profile → Video walk → Video chair → Reaction → Results
@@ -109,7 +113,9 @@ npm install
 npm run dev
 ```
 
-Open http://localhost:5173 (proxies API to port 8000; keep server running). Use **Guided check-in** in the nav for the same workflow as the built-in UI.
+Open http://localhost:5173 (proxies API to port 8000; keep server running).
+
+**New mobile UI flow:** Welcome → Journal picker → Parent test hub → Longevity dashboard (matches design mockups). Legacy guided check-in: `/guided`, full detail: `/dashboard/detail`.
 
 ## API (MVP)
 

@@ -266,3 +266,27 @@ async def list_all_sessions(profile_id: int, limit: int = 24) -> dict[str, Any]:
             "gaits": await gaits(),
             "chairs": await chairs(),
         }
+
+
+async def clear_assessment_data() -> dict[str, int]:
+    """Delete all biomarker sessions and uploaded videos (keeps profile)."""
+    import shutil
+
+    counts = {"reactions": 0, "gaits": 0, "chairs": 0, "videos_removed": 0}
+    async with aiosqlite.connect(DB_PATH) as db:
+        for table, key in (
+            ("reaction_sessions", "reactions"),
+            ("gait_sessions", "gaits"),
+            ("chair_sessions", "chairs"),
+        ):
+            cur = await db.execute(f"DELETE FROM {table}")
+            counts[key] = cur.rowcount
+        await db.commit()
+
+    videos_dir = DATA_DIR / "videos"
+    if videos_dir.is_dir():
+        for f in videos_dir.iterdir():
+            if f.is_file():
+                f.unlink(missing_ok=True)
+                counts["videos_removed"] += 1
+    return counts

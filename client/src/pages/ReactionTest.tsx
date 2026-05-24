@@ -1,5 +1,6 @@
 import { useCallback, useRef, useState } from "react";
 import { Link } from "react-router-dom";
+import TestBack from "../components/TestBack";
 import { saveReaction, type CategoryScore } from "../api";
 
 const TRIALS = 5;
@@ -92,6 +93,7 @@ export default function ReactionTest({ embedded, onSaved }: Props = {}) {
   const Tag = embedded ? "div" : "section";
   return (
     <Tag className={embedded ? "" : "card"}>
+      {!embedded && <TestBack />}
       <h2>Cognitive Speed</h2>
       <p className="muted">
         Parent taps when the circle turns green (simple reaction time). Scored vs age norms from

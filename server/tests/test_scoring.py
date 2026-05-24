@@ -21,6 +21,14 @@ def test_bohannon_norm_in_range():
 def test_studenski_band_slow_walk():
     result = score_gait(5.0, 68, "female")
     assert result["raw"]["studenski_band"] in ("0.6-0.79", "<0.6", "0.8-0.99")
+    assert result["score"] < 65
+
+
+def test_gait_at_bohannon_norm_scores_high():
+    expected = expected_gait_mps(68, "female")
+    time_at_norm = 3.048 / expected
+    result = score_gait(time_at_norm, 68, "female")
+    assert result["score"] >= 75
 
 
 def test_reaction_woods_norm():

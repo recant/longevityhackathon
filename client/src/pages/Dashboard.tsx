@@ -99,7 +99,7 @@ export default function Dashboard({ embedded }: { embedded?: boolean } = {}) {
             <p style={{ margin: "0.35rem 0 0" }}>{insights.conversation_tip}</p>
           </div>
           {insights.mock && (
-            <p className="muted">Set OPENAI_API_KEY on the server for richer personalized text.</p>
+            <p className="muted">Set OLLAMA_API_KEY or OPENAI_API_KEY on the server for richer personalized text.</p>
           )}
         </section>
       )}

@@ -102,12 +102,12 @@ export async function saveGait(time_seconds: number) {
   );
 }
 
-export async function saveChairStand(reps: number) {
+export async function saveChairStand(riseTimeSeconds: number) {
   return json<ScoredSession>(
     await fetch("/api/assessments/chair-stand", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ reps }),
+      body: JSON.stringify({ rise_time_seconds: riseTimeSeconds }),
     })
   );
 }

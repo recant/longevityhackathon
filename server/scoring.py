@@ -178,12 +178,23 @@ def _studenski_pace_note(speed: float) -> str:
     )
 
 
+def _studenski_mobility_score(speed_mps: float) -> float:
+    """Studenski et al. JAMA 2011 gait-speed survival bands → 0–100 anchor (REFERENCES.md)."""
+    if speed_mps >= 1.0:
+        return _clamp(78 + min(22, (speed_mps - 1.0) * 50))
+    if speed_mps >= 0.8:
+        return _clamp(62 + (speed_mps - 0.8) / 0.2 * 16)
+    if speed_mps >= 0.6:
+        return _clamp(48 + (speed_mps - 0.6) / 0.2 * 14)
+    return _clamp(28 + speed_mps / 0.6 * 20)
+
+
 def score_gait_from_cv(cv: dict[str, Any], age: int, sex: str | None = None) -> dict[str, Any]:
     """Map computer-vision gait metrics to standard Mobility category score."""
     scores = score_gait(float(cv["time_seconds"]), age, sex)
     sym = float(cv.get("symmetry_index", 0.65))
     stead = float(cv.get("steadiness_index", 0.65))
-    cv_bonus = (sym + stead) / 2 * 8
+    cv_bonus = (sym + stead) / 2 * 5
     scores["score"] = round(min(100, scores["score"] + cv_bonus), 1)
     scores["assessment_mode"] = "computer_vision"
     scores["interpretation"] = (
@@ -196,13 +207,112 @@ def score_gait_from_cv(cv: dict[str, Any], age: int, sex: str | None = None) -> 
     return scores
 
 
+# Upward phase ≈ half of full sit-to-stand cycle (used to map one rise → Rikli 30s rep equivalent)
+_CHAIR_RISE_FRACTION = 0.50
+
+
+def expected_chair_rise_seconds(age: int, sex: str | None = None) -> float:
+    """
+    Typical upward-phase rise time (seconds) implied by Rikli & Jones 30s rep norms.
+
+    mean_cycle = 30 / expected_reps; rise ≈ mean_cycle × rise_fraction.
+    """
+    reps = expected_chair_reps(age, sex)
+    return (30.0 / reps) * _CHAIR_RISE_FRACTION
+
+
+def rise_time_to_equivalent_reps_30s(
+    rise_time_seconds: float, age: int, sex: str | None = None
+) -> float:
+    """
+    Convert single-stand rise duration to STEADI/Rikli-equivalent reps in 30 seconds.
+
+    REFERENCES.md cites Rikli & Jones rep norms; CDC STEADI uses the 30s chair stand.
+    """
+    rise = max(rise_time_seconds, 0.4)
+    expected_reps = expected_chair_reps(age, sex)
+    mean_cycle_sec = 30.0 / expected_reps
+    implied_full_cycle = rise / _CHAIR_RISE_FRACTION
+    return 30.0 / max(implied_full_cycle, mean_cycle_sec * 0.35)
+
+
+def _chair_smoothness_adjustment(smoothness_index: float) -> float:
+    """Small ±5 pt adjustment when CV smoothness is measured; neutral when unknown."""
+    s = max(0.0, min(1.0, smoothness_index))
+    if s < 0.25:
+        return 0.0
+    return (s - 0.65) * 12
+
+
+def score_chair_single_stand(
+    rise_time_seconds: float,
+    smoothness_index: float,
+    age: int,
+    sex: str | None = None,
+) -> dict[str, Any]:
+    """
+    Score one chair stand using Rikli & Jones 30s rep norms (REFERENCES.md).
+
+    Rise time is converted to an equivalent 30s rep count, then scored like score_chair_stand.
+    """
+    expected_reps = expected_chair_reps(age, sex)
+    reps_eq = rise_time_to_equivalent_reps_30s(rise_time_seconds, age, sex)
+    score = _clamp((reps_eq / expected_reps) * 90 + _chair_smoothness_adjustment(smoothness_index))
+    offset_years = round((expected_reps - reps_eq) * 1.2, 1)
+    functional_age = max(50, age + int(offset_years))
+    expected_rise = expected_chair_rise_seconds(age, sex)
+
+    if score >= 75:
+        band = "strong"
+        line = (
+            f"Stand was quick (~{rise_time_seconds:.1f}s rise, ~{reps_eq:.0f} equivalent 30s reps vs "
+            f"~{expected_reps:.0f} for age/sex, Rikli & Jones Senior Fitness Test)."
+        )
+    elif score >= 55:
+        band = "typical"
+        line = (
+            f"Stand timing (~{rise_time_seconds:.1f}s rise) is in a typical range for age "
+            f"(~{reps_eq:.0f} equivalent 30s reps; CDC STEADI / Rikli norms)."
+        )
+    else:
+        band = "watch"
+        line = (
+            "Stand was slower than age norms on the 30-second chair-stand scale — "
+            "gentle sit-to-stand practice can help (CDC STEADI)."
+        )
+
+    return {
+        "category": "strength_stability",
+        "label": "Strength & Stability",
+        "score": round(score, 1),
+        "band": band,
+        "interpretation": line,
+        "functional_age": functional_age,
+        "assessment_mode": "manual",
+        "raw": {
+            "rise_time_seconds": round(rise_time_seconds, 2),
+            "smoothness_index": round(smoothness_index, 3),
+            "reps_30s_equivalent": round(reps_eq, 1),
+            "expected_reps_30s": round(expected_reps, 1),
+            "expected_rise_seconds": round(expected_rise, 2),
+        },
+        "evidence": [
+            "CDC STEADI 30-second Chair Stand",
+            "Rikli & Jones, Senior Fitness Test",
+            "LIFE Study, JAMA 2014",
+        ],
+        "emoji": "chair",
+    }
+
+
 def score_chair_from_cv(cv: dict[str, Any], age: int, sex: str | None = None) -> dict[str, Any]:
-    reps = int(cv.get("reps_30s_est", 0))
-    scores = score_chair_stand(reps, age, sex)
+    rise = float(cv["rise_time_seconds"])
+    smooth = float(cv["smoothness_index"])
+    scores = score_chair_single_stand(rise, smooth, age, sex)
     scores["assessment_mode"] = "computer_vision"
     scores["interpretation"] = (
         scores["interpretation"]
-        + f" Video analysis counted ~{reps} stands ({cv.get('method', 'opencv')})."
+        + f" Video: {rise:.1f}s rise, {smooth:.0%} smooth ({cv.get('method', 'opencv')})."
     )
     scores["raw"] = {**scores["raw"], "cv": cv}
     scores["evidence"] = list(scores.get("evidence", [])) + ["Computer vision movement analysis"]
@@ -212,7 +322,9 @@ def score_chair_from_cv(cv: dict[str, Any], age: int, sex: str | None = None) ->
 def score_gait(time_seconds: float, age: int, sex: str | None = None) -> dict[str, Any]:
     speed = gait_speed_mps(time_seconds)
     expected = expected_gait_mps(age, sex)
-    score = _clamp((speed / expected) * 92)
+    bohannon_score = _clamp((speed / expected) * 92)
+    studenski_score = _studenski_mobility_score(speed)
+    score = _clamp(0.68 * bohannon_score + 0.32 * studenski_score)
     offset_years = round((expected - speed) * 18, 1)
     functional_age = max(50, age + int(offset_years))
     pace_note = _studenski_pace_note(speed)
@@ -236,6 +348,8 @@ def score_gait(time_seconds: float, age: int, sex: str | None = None) -> dict[st
             "time_seconds": round(time_seconds, 2),
             "speed_mps": round(speed, 3),
             "expected_mps": round(expected, 3),
+            "bohannon_score": round(bohannon_score, 1),
+            "studenski_score": round(studenski_score, 1),
             "studenski_band": (
                 "≥1.0" if speed >= 1.0 else "0.8-0.99" if speed >= 0.8 else "0.6-0.79" if speed >= 0.6 else "<0.6"
             ),

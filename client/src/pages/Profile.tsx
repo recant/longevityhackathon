@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from "react";
+import { Link } from "react-router-dom";
 import { getProfile, updateProfile, type Profile as ProfileType } from "../api";
 
 type Props = { embedded?: boolean; onSaved?: () => void };
@@ -43,6 +44,11 @@ export default function Profile({ embedded, onSaved }: Props = {}) {
   const Tag = embedded ? "div" : "section";
   return (
     <Tag className={embedded ? "" : "card"}>
+      {!embedded && (
+        <Link to="/journals" className="test-back">
+          ← Back
+        </Link>
+      )}
       <h2>Parent profile</h2>
       <p className="muted">
         Scores are adjusted for age and sex — this helps compare to typical patterns, not to

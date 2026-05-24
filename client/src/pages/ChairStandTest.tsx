@@ -1,56 +1,53 @@
-import { useEffect, useRef, useState } from "react";
+import { useRef, useState } from "react";
 import { Link } from "react-router-dom";
+import TestBack from "../components/TestBack";
 import { saveChairStand, type CategoryScore } from "../api";
-
-const DURATION = 30;
 
 type Props = { embedded?: boolean; onSaved?: () => void };
 
 export default function ChairStandTest({ embedded, onSaved }: Props = {}) {
   const [phase, setPhase] = useState<"idle" | "running" | "done">("idle");
-  const [secondsLeft, setSecondsLeft] = useState(DURATION);
-  const [reps, setReps] = useState(0);
+  const [elapsed, setElapsed] = useState(0);
   const [saving, setSaving] = useState(false);
   const [scores, setScores] = useState<CategoryScore | null>(null);
-  const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const startRef = useRef(0);
+  const tickRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
-  useEffect(() => {
-    return () => {
-      if (intervalRef.current) clearInterval(intervalRef.current);
-    };
-  }, []);
+  const stopTick = () => {
+    if (tickRef.current) clearInterval(tickRef.current);
+    tickRef.current = null;
+  };
 
   const start = () => {
     setScores(null);
-    setReps(0);
-    setSecondsLeft(DURATION);
+    setElapsed(0);
     setPhase("running");
-    intervalRef.current = setInterval(() => {
-      setSecondsLeft((s) => {
-        if (s <= 1) {
-          if (intervalRef.current) clearInterval(intervalRef.current);
-          setPhase("done");
-          return 0;
-        }
-        return s - 1;
-      });
-    }, 1000);
+    startRef.current = performance.now();
+    stopTick();
+    tickRef.current = setInterval(() => {
+      setElapsed((performance.now() - startRef.current) / 1000);
+    }, 50);
   };
 
-  const addRep = () => {
-    if (phase === "running") setReps((r) => r + 1);
-  };
-
-  const finishEarly = () => {
-    if (intervalRef.current) clearInterval(intervalRef.current);
+  const finish = () => {
+    if (phase !== "running") return;
+    stopTick();
+    setElapsed((performance.now() - startRef.current) / 1000);
     setPhase("done");
-    setSecondsLeft(0);
+  };
+
+  const reset = () => {
+    stopTick();
+    setPhase("idle");
+    setElapsed(0);
+    setScores(null);
   };
 
   const save = async () => {
+    if (elapsed < 0.4) return;
     setSaving(true);
     try {
-      const res = await saveChairStand(reps);
+      const res = await saveChairStand(elapsed);
       setScores(res.scores);
       onSaved?.();
     } catch (e) {
@@ -63,37 +60,40 @@ export default function ChairStandTest({ embedded, onSaved }: Props = {}) {
   const Tag = embedded ? "div" : "section";
   return (
     <Tag className={embedded ? "" : "card"}>
+      {!embedded && <TestBack />}
       <h2>Strength & Stability — chair stand</h2>
       <p className="muted">
-        <strong>CDC STEADI 30-second chair stand:</strong> sturdy chair, arms crossed on chest if
-        safe (or hands on thighs). Count full stands in 30 seconds — tap +1 each time. Compared to
-        Rikli &amp; Jones Senior Fitness Test norms.
+        Sit fully on a sturdy chair, then stand once smoothly. Tap <strong>Start</strong> when the
+        rise begins and <strong>Finish</strong> when fully upright. We score quickness and assume
+        typical smoothness for manual timing.
       </p>
+      <div className="timer-display">
+        {phase === "idle" && elapsed === 0 ? "—" : `${elapsed.toFixed(2)}s`}
+      </div>
       {phase === "idle" && (
         <button type="button" className="btn block" onClick={start}>
-          Start 30-second activity
+          Start stand
         </button>
       )}
       {phase === "running" && (
         <>
-          <div className="timer-display">{secondsLeft}s</div>
-          <p style={{ textAlign: "center", fontSize: "2rem", fontWeight: 800 }}>{reps} stands</p>
-          <button type="button" className="btn block" onClick={addRep}>
-            +1 stand
+          <button type="button" className="btn block" onClick={finish}>
+            Finish stand
           </button>
-          <button type="button" className="btn secondary block" style={{ marginTop: "0.5rem" }} onClick={finishEarly}>
-            Finish early
+          <button type="button" className="btn secondary block" style={{ marginTop: "0.5rem" }} onClick={reset}>
+            Reset
           </button>
         </>
       )}
-      {phase === "done" && (
+      {phase === "done" && !scores && (
         <>
-          <p className="success-msg">Total: {reps} stands in 30 seconds</p>
-          {!scores && (
-            <button type="button" className="btn block" disabled={saving} onClick={save}>
-              {saving ? "Saving…" : "Save & see insight"}
-            </button>
-          )}
+          <p className="success-msg">Rise time: {elapsed.toFixed(2)} seconds</p>
+          <button type="button" className="btn block" disabled={saving} onClick={save}>
+            {saving ? "Saving…" : "Save & see insight"}
+          </button>
+          <button type="button" className="btn secondary block" style={{ marginTop: "0.5rem" }} onClick={reset}>
+            Try again
+          </button>
         </>
       )}
       {scores && (

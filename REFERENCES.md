@@ -25,4 +25,10 @@ In a pooled analysis (n≈34,000), faster gait speed was associated with better 
 
 ## Implementation
 
-Norm tables and thresholds are coded in [`server/scoring.py`](server/scoring.py). Optional OpenAI text in [`server/insights.py`](server/insights.py) is instructed to stay consistent with this evidence and avoid diagnostic language.
+Norm tables and thresholds are coded in [`server/scoring.py`](server/scoring.py).
+
+- **Walk / mobility:** Bohannon & Andrews 2011 comfortable gait speed (10-foot timed walk → m/s), blended with Studenski et al. 2011 speed bands for the 0–100 score.
+- **Chair / strength:** Rikli & Jones 30-second chair-stand rep norms (CDC STEADI protocol). A single sit-to-stand rise is converted to an equivalent 30s rep count (rise phase ≈ half of a full cycle) and scored on the same scale.
+- **Video uploads (optional):** [`server/human_presence.py`](server/human_presence.py) can gate uploads on person detection; currently **disabled** (`ENABLE_HUMAN_PRESENCE_GATE = False`).
+
+Optional OpenAI text in [`server/insights.py`](server/insights.py) is instructed to stay consistent with this evidence and avoid diagnostic language.

@@ -5,16 +5,29 @@ from __future__ import annotations
 import shutil
 import uuid
 from pathlib import Path
+
+# Load .env from repo root or server/ (OLLAMA_API_KEY, OPENAI_API_KEY, etc.)
+try:
+    from dotenv import load_dotenv
+
+    _root = Path(__file__).resolve().parent.parent
+    load_dotenv(_root / ".env")
+    load_dotenv(Path(__file__).resolve().parent / ".env")
+except ImportError:
+    pass
 from typing import Any
 
-from fastapi import FastAPI, File, Form, HTTPException, UploadFile
+from fastapi import FastAPI, File, Form, HTTPException, Request, UploadFile
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import FileResponse
+from fastapi.responses import FileResponse, RedirectResponse, Response
+from fastapi.staticfiles import StaticFiles
+from starlette.middleware.base import BaseHTTPMiddleware
 from pydantic import BaseModel, Field
 
-from cv_analysis import analyze_chair_video, analyze_walk_video
+from cv_analysis import ActionMismatchError, analyze_chair_video, analyze_walk_video, reset_pose_detectors
 from database import (
     DATA_DIR,
+    clear_assessment_data,
     get_default_profile,
     init_db,
     list_all_sessions,
@@ -31,6 +44,7 @@ from scoring import (
     default_actions,
     overall_snapshot,
     score_chair_from_cv,
+    score_chair_single_stand,
     score_chair_stand,
     score_gait,
     score_gait_from_cv,
@@ -38,6 +52,10 @@ from scoring import (
 )
 
 STATIC_DIR = Path(__file__).parent / "static"
+UI_DIR = STATIC_DIR / "ui"
+V2_DIR = STATIC_DIR / "v2"
+LEGACY_UI = STATIC_DIR / "index.html"
+BUILD_ID = "2026-05-24-v2-integrated"
 
 app = FastAPI(title="KinSpan API", version="0.2.0", description="Longevity translator for families")
 
@@ -48,6 +66,21 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+
+class NoCacheMiddleware(BaseHTTPMiddleware):
+    """Prevent stale HTML/JS/API scores from browser disk cache during development."""
+
+    async def dispatch(self, request: Request, call_next):
+        response: Response = await call_next(request)
+        path = request.url.path
+        if path.startswith("/api") or path in ("/", "/classic") or path.startswith("/ui") or path.startswith("/v2"):
+            response.headers["Cache-Control"] = "no-store, no-cache, must-revalidate, max-age=0"
+            response.headers["Pragma"] = "no-cache"
+        return response
+
+
+app.add_middleware(NoCacheMiddleware)
 
 
 @app.on_event("startup")
@@ -74,6 +107,10 @@ class GaitBody(BaseModel):
 
 
 class ChairBody(BaseModel):
+    rise_time_seconds: float = Field(..., gt=0.4, le=20.0)
+
+
+class ChairRepsBody(BaseModel):
     reps: int = Field(..., ge=0, le=50)
 
 
@@ -133,10 +170,51 @@ def _build_snapshot(profile: dict[str, Any], history: dict[str, Any]) -> dict[st
     }
 
 
+def _ui_file(path: Path) -> FileResponse:
+    return FileResponse(path, headers={"Cache-Control": "no-store, no-cache, must-revalidate"})
+
+
 @app.get("/")
-async def test_ui() -> FileResponse:
-    """Basic single-server test UI (no npm required)."""
-    return FileResponse(STATIC_DIR / "index.html")
+async def root_ui() -> FileResponse:
+    """KinSpan v2 UI (integrated with API)."""
+    if (V2_DIR / "index.html").is_file():
+        return _ui_file(V2_DIR / "index.html")
+    if (UI_DIR / "index.html").is_file():
+        return _ui_file(UI_DIR / "index.html")
+    return _ui_file(LEGACY_UI)
+
+
+@app.get("/classic")
+async def classic_ui() -> FileResponse:
+    """Full guided test UI with video analysis."""
+    return _ui_file(LEGACY_UI)
+
+
+@app.get("/v2")
+async def v2_ui_redirect() -> RedirectResponse:
+    """Longevity App v2 (same UI as /)."""
+    return RedirectResponse(url="/v2/", status_code=302)
+
+
+if UI_DIR.is_dir():
+    app.mount("/ui", StaticFiles(directory=UI_DIR), name="ui")
+
+if V2_DIR.is_dir():
+    app.mount("/v2", StaticFiles(directory=V2_DIR, html=True), name="v2")
+
+
+@app.post("/api/reset")
+async def reset_data() -> dict[str, Any]:
+    """Clear assessment sessions, uploaded videos, and in-memory CV pose detectors."""
+    reset_pose_detectors()
+    counts = await clear_assessment_data()
+    return {
+        "ok": True,
+        "cleared": counts,
+        "hint": "Hard-refresh the browser (Ctrl+Shift+R). In devtools: "
+        "localStorage.removeItem('kinspan_path'); localStorage.removeItem('kinspan_completed'); "
+        "localStorage.removeItem('kinspan_workflow_step');",
+    }
 
 
 @app.get("/api/health")
@@ -147,7 +225,19 @@ async def health() -> dict[str, str]:
         cv_backend = "opencv+mediapipe"
     except ImportError:
         cv_backend = "opencv"
-    return {"status": "ok", "app": "kinspan", "ui": "/", "cv_backend": cv_backend}
+    return {
+        "status": "ok",
+        "app": "kinspan",
+        "ui": "/",
+        "ui_v2_preview": "/v2/",
+        "cv_backend": cv_backend,
+        "build": BUILD_ID,
+    }
+
+
+@app.get("/api/version")
+async def version() -> dict[str, str]:
+    return {"build": BUILD_ID, "classic": "/classic", "ui": "/"}
 
 
 @app.get("/api/paths")
@@ -208,6 +298,16 @@ async def post_gait(body: GaitBody) -> dict:
 async def post_chair(body: ChairBody) -> dict:
     prof = await get_default_profile()
     age, sex = _profile_age_sex(prof)
+    scores = score_chair_single_stand(body.rise_time_seconds, 0.5, age, sex)
+    session = await save_chair(prof["id"], 1, scores)
+    return {"session": session, "scores": scores}
+
+
+@app.post("/api/assessments/chair-reps")
+async def post_chair_reps(body: ChairRepsBody) -> dict:
+    """CDC STEADI 30-second chair stand — rep count scoring (Rikli norms)."""
+    prof = await get_default_profile()
+    age, sex = _profile_age_sex(prof)
     scores = score_chair_stand(body.reps, age, sex)
     session = await save_chair(prof["id"], body.reps, scores)
     return {"session": session, "scores": scores}
@@ -249,10 +349,17 @@ async def post_cv_walk(
     try:
         cv = analyze_walk_video(dest, distance_meters=distance_meters)
         scores = score_gait_from_cv(cv, age, sex)
+    except ActionMismatchError as e:
+        dest.unlink(missing_ok=True)
+        raise HTTPException(400, str(e)) from e
+    except ValueError as e:
+        dest.unlink(missing_ok=True)
+        raise HTTPException(400, str(e)) from e
     except Exception as e:
         dest.unlink(missing_ok=True)
         raise HTTPException(500, f"Video analysis failed: {e}") from e
     session = await save_gait(prof["id"], float(cv["time_seconds"]), scores)
+    dest.unlink(missing_ok=True)
     return {"session": session, "scores": scores, "cv": cv}
 
 
@@ -263,12 +370,18 @@ async def post_cv_chair(video: UploadFile = File(...)) -> dict[str, Any]:
     dest = _save_upload(video)
     try:
         cv = analyze_chair_video(dest)
-        reps = int(cv["reps_30s_est"])
         scores = score_chair_from_cv(cv, age, sex)
+    except ActionMismatchError as e:
+        dest.unlink(missing_ok=True)
+        raise HTTPException(400, str(e)) from e
+    except ValueError as e:
+        dest.unlink(missing_ok=True)
+        raise HTTPException(400, str(e)) from e
     except Exception as e:
         dest.unlink(missing_ok=True)
         raise HTTPException(500, f"Video analysis failed: {e}") from e
-    session = await save_chair(prof["id"], reps, scores)
+    session = await save_chair(prof["id"], 1, scores)
+    dest.unlink(missing_ok=True)
     return {"session": session, "scores": scores, "cv": cv}
 
 

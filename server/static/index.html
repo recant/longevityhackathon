@@ -3,6 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate" />
   <title>KinSpan — Test UI</title>
   <link href="https://fonts.googleapis.com/css2?family=Nunito:wght@400;600;700;800&display=swap" rel="stylesheet" />
   <style>
@@ -68,8 +69,19 @@
     .path-card.selected { border-color: var(--primary); background: var(--primary-soft); }
     .path-card strong { display: block; margin-bottom: 0.25rem; }
     .path-card span { font-size: 0.82rem; color: var(--muted); }
-    .video-wrap { background: #1a2428; border-radius: var(--radius); overflow: hidden; margin: 0.75rem 0; aspect-ratio: 4/3; }
+    .video-wrap { background: #1a2428; border-radius: var(--radius); overflow: hidden; margin: 0.75rem 0; aspect-ratio: 4/3; position: relative; }
     .video-wrap video { width: 100%; height: 100%; object-fit: cover; }
+    .record-bar {
+      display: none; align-items: center; gap: 0.5rem; margin: 0.5rem 0 0;
+      padding: 0.55rem 0.75rem; background: #2a1818; color: #fff; border-radius: 10px; font-size: 0.88rem; font-weight: 700;
+    }
+    .record-bar.active { display: flex; }
+    .rec-dot { width: 0.55rem; height: 0.55rem; border-radius: 50%; background: #e85d5d; animation: recPulse 1s ease infinite; flex-shrink: 0; }
+    @keyframes recPulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.35; } }
+    .cv-result-summary { margin-top: 0.25rem; }
+    .cv-result-summary .score-big { margin: 0; line-height: 1.1; }
+    .cv-result-summary .cv-label { font-weight: 800; margin: 0.35rem 0 0; font-size: 0.95rem; }
+    .cv-result-summary .cv-summary { margin: 0.45rem 0 0; color: var(--muted); line-height: 1.5; font-size: 0.92rem; }
     .workflow-stepper { display: flex; gap: 0.35rem; overflow-x: auto; padding: 0.5rem 0 1rem; margin-bottom: 0.25rem; }
     .workflow-step { flex: 1; min-width: 4.2rem; text-align: center; opacity: 0.5; font-size: 0.68rem; font-weight: 700; }
     .workflow-step.active, .workflow-step.done { opacity: 1; }
@@ -94,13 +106,20 @@
     .workflow-list li { margin-bottom: 0.4rem; }
     .workflow-hint { text-align: center; font-size: 0.88rem; color: var(--muted); margin: 0.5rem 0 0; }
     #tabs { display: none; }
+    body.embed .embed-hide { display: none !important; }
+    body.embed .wrap { max-width: 100%; padding-top: 0.5rem; }
+    body.embed h1 { font-size: 1.25rem; }
   </style>
 </head>
 <body>
   <div class="wrap">
     <h1>KinSpan</h1>
-    <p class="tag">Basic test UI · <span id="apiStatus">checking API…</span></p>
-    <div class="notice">Wellness trends only — not medical diagnosis. One server: <code>uvicorn main:app --port 8000</code></div>
+    <p class="tag">Guided check-in · <span id="apiStatus">checking API…</span></p>
+    <p class="hint embed-hide" style="background:var(--primary-soft);padding:0.5rem 0.75rem;border-radius:8px">
+      <a href="/" target="_top" style="color:var(--secondary);font-weight:700">← Back to home screen</a>
+      · <a href="/classic" style="color:var(--secondary);font-weight:700">Open classic in full page</a>
+    </p>
+    <div class="notice embed-hide">Wellness trends only — not medical diagnosis. Run <code>server/start.ps1</code> (port 8003).</div>
 
     <h2 style="font-size:1rem;margin:0.75rem 0 0.35rem">Choose assessment path</h2>
     <div class="path-cards">
@@ -176,25 +195,29 @@
     </section>
 
     <section id="chair">
-      <h2>30s chair stand (STEADI)</h2>
-      <p class="hint">Count full stands in 30 seconds. Rikli &amp; Jones norms.</p>
-      <div id="chairTimer" class="big">30</div>
-      <p style="text-align:center;font-size:1.5rem;font-weight:800" id="chairCount">0 stands</p>
-      <button type="button" class="btn" id="chairStart">Start 30s</button>
-      <button type="button" class="btn secondary" id="chairPlus" disabled>+1 stand</button>
+      <h2>Single chair stand</h2>
+      <p class="hint">Sit fully, then stand once smoothly. Time from movement start to fully upright.</p>
+      <div id="chairTimer" class="big">—</div>
+      <div class="row" style="justify-content:center;gap:0.5rem;flex-wrap:wrap">
+        <button type="button" class="btn" id="chairStart">Start stand</button>
+        <button type="button" class="btn secondary" id="chairStop" disabled>Finish stand</button>
+        <button type="button" class="btn secondary" id="chairReset">Reset</button>
+      </div>
       <button type="button" class="btn" id="saveChair" disabled>Save chair test</button>
       <div id="chairOut" class="result" style="display:none"></div>
     </section>
 
     <section id="cvWalk">
       <h2>Video — walking gait</h2>
-      <p class="hint">Film 10–15s side or diagonal view. CV estimates speed, cadence, symmetry. Mark 10 ft on floor.</p>
+      <p class="hint">Film 10–15s of walking across the frame (side view). We only check that you move sideways — step motion is not treated as chair stands.</p>
       <label>Walk distance (meters)</label>
       <input id="cvWalkDist" type="number" step="0.1" value="3.048" />
       <div class="video-wrap"><video id="cvWalkPreview" playsinline muted></video></div>
+      <div class="record-bar" id="cvWalkRecordBar"><span class="rec-dot" aria-hidden="true"></span><span>Recording… point camera at walking</span><button type="button" class="btn secondary" id="cvWalkStopRec" style="margin:0;margin-left:auto;padding:0.4rem 0.75rem;font-size:0.85rem">Stop</button></div>
       <div class="btn-row">
-        <button type="button" class="btn secondary" id="cvWalkCam">Record / pick video</button>
-        <input type="file" id="cvWalkFile" accept="video/*" capture="environment" style="display:none" />
+        <button type="button" class="btn secondary" id="cvWalkPick">Upload video</button>
+        <button type="button" class="btn secondary" id="cvWalkRecord">Record now</button>
+        <input type="file" id="cvWalkFile" accept="video/*" style="display:none" />
         <button type="button" class="btn" id="cvWalkUpload" disabled>Analyze walk</button>
       </div>
       <div id="cvWalkOut" class="result" style="display:none"></div>
@@ -202,11 +225,13 @@
 
     <section id="cvChair">
       <h2>Video — chair stand</h2>
-      <p class="hint">Film 30s of sit-to-stand reps. CV counts stands from body motion.</p>
+      <p class="hint">Film one sit-to-stand in place (~5–10s). We score how quick and smooth the rise is.</p>
       <div class="video-wrap"><video id="cvChairPreview" playsinline muted></video></div>
+      <div class="record-bar" id="cvChairRecordBar"><span class="rec-dot" aria-hidden="true"></span><span>Recording… film one sit-to-stand</span><button type="button" class="btn secondary" id="cvChairStopRec" style="margin:0;margin-left:auto;padding:0.4rem 0.75rem;font-size:0.85rem">Stop</button></div>
       <div class="btn-row">
-        <button type="button" class="btn secondary" id="cvChairCam">Record / pick video</button>
-        <input type="file" id="cvChairFile" accept="video/*" capture="environment" style="display:none" />
+        <button type="button" class="btn secondary" id="cvChairPick">Upload video</button>
+        <button type="button" class="btn secondary" id="cvChairRecord">Record now</button>
+        <input type="file" id="cvChairFile" accept="video/*" style="display:none" />
         <button type="button" class="btn" id="cvChairUpload" disabled>Analyze chair</button>
       </div>
       <div id="cvChairOut" class="result" style="display:none"></div>
@@ -230,6 +255,7 @@
     const API = "";
     async function api(path, opts = {}) {
       const r = await fetch(API + path, {
+        cache: "no-store",
         headers: opts.body && !(opts.body instanceof FormData) ? { "Content-Type": "application/json" } : {},
         ...opts,
         body: opts.body && typeof opts.body === "object" && !(opts.body instanceof FormData)
@@ -245,20 +271,32 @@
       el.textContent = typeof data === "string" ? data : JSON.stringify(data, null, 2);
     }
 
+    const IS_EMBED =
+      new URLSearchParams(location.search).get("embed") === "1" || window.self !== window.top;
+    if (IS_EMBED) document.body.classList.add("embed");
+
+    function notifyParent(event) {
+      try {
+        if (window.parent !== window) {
+          window.parent.postMessage({ type: "kinspan:" + event }, location.origin);
+        }
+      } catch (_) { /* cross-origin guard */ }
+    }
+
     // Guided workflow (two paths)
     const MANUAL_WORKFLOW = [
       { id: "intro", section: "intro", title: "Welcome", subtitle: "At-home tests — about 10 minutes" },
       { id: "profile", section: "profile", title: "Profile", subtitle: "Age & sex for fair comparisons" },
       { id: "reaction", section: "reaction", title: "Reaction", subtitle: "Tap when green (5 trials)" },
       { id: "walk", section: "walk", title: "Walk", subtitle: "10-foot timed walk" },
-      { id: "chair", section: "chair", title: "Chair", subtitle: "30-second stand count" },
+      { id: "chair", section: "chair", title: "Chair", subtitle: "Single timed stand" },
       { id: "results", section: "dash", title: "Results", subtitle: "Trajectory & next steps" },
     ];
     const VISION_WORKFLOW = [
       { id: "intro", section: "intro", title: "Welcome", subtitle: "Video analysis — two short clips" },
       { id: "profile", section: "profile", title: "Profile", subtitle: "Age & sex for fair comparisons" },
       { id: "cvWalk", section: "cvWalk", title: "Video walk", subtitle: "Gait from a walking clip" },
-      { id: "cvChair", section: "cvChair", title: "Video chair", subtitle: "Count stands from video" },
+      { id: "cvChair", section: "cvChair", title: "Video chair", subtitle: "Quickness & smoothness from video" },
       { id: "reaction", section: "reaction", title: "Reaction", subtitle: "Quick tap test (no video)" },
       { id: "results", section: "dash", title: "Results", subtitle: "Trajectory & next steps" },
     ];
@@ -270,7 +308,7 @@
           "Set up your parent's profile",
           "Reaction — tap when the screen turns green",
           "Walk — time a normal 10-foot walk",
-          "Chair stand — count stands in 30 seconds",
+          "Chair stand — time one smooth sit-to-stand",
           "See results, trends, and conversation tips",
         ],
         tip: "No video upload — just a hallway and a sturdy chair.",
@@ -281,11 +319,11 @@
         steps: [
           "Set up your parent's profile",
           "Film a walking clip (side view, ~10–15 seconds)",
-          "Film chair stands for ~30 seconds",
+          "Film one smooth chair stand (~5–10 seconds)",
           "Reaction tap test together",
           "Review trajectory and gentle recommendations",
         ],
-        tip: "Good lighting, full body in frame, phone held steady.",
+        tip: "Record in the app or upload a clip — good lighting, full body in frame.",
       },
     };
 
@@ -333,6 +371,7 @@
       saveCompleted();
       renderWorkflowUI();
       syncWorkflowNav();
+      notifyParent("assessment-saved");
     }
 
     function resetWorkflow() {
@@ -411,6 +450,16 @@
     };
     applyPath();
 
+    const hashSection = location.hash.replace("#", "");
+    if (hashSection) {
+      const steps = getWorkflow();
+      const idx = steps.findIndex((s) => s.section === hashSection);
+      if (idx >= 0) {
+        stepIndex = idx;
+        showWorkflowStep();
+      }
+    }
+
     // Health
     api("/api/health").then((d) => {
       document.getElementById("apiStatus").textContent = "API OK · " + d.app;
@@ -420,51 +469,196 @@
       document.getElementById("apiStatus").innerHTML = '<span class="err">API offline</span>';
     });
 
-    // CV video helpers
-    function wireVideo(fileInput, preview, uploadBtn) {
+    // CV video — upload file or record in-browser
+    function showCvSummary(el, scores) {
+      el.style.display = "block";
+      el.className = "result cv-result-summary";
+      el.innerHTML =
+        '<div class="score-big">' + scores.score + '<span style="font-size:1rem;font-weight:700">/100</span></div>' +
+        '<p class="cv-label">' + escapeHtml(scores.label || "Score") + '</p>' +
+        '<p class="cv-summary">' + escapeHtml(scores.interpretation || "") + '</p>';
+    }
+    function escapeHtml(s) {
+      return String(s).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
+    }
+
+    function setupVideoCapture(cfg) {
+      const { fileInput, preview, uploadBtn, pickBtn, recordBtn, recordBar, stopRecBtn } = cfg;
+      let mediaStream = null;
+      let mediaRecorder = null;
+      let chunks = [];
+      let recordedBlob = null;
+      let previewObjectUrl = null;
+
+      function clearPreviewUrl() {
+        if (previewObjectUrl) {
+          URL.revokeObjectURL(previewObjectUrl);
+          previewObjectUrl = null;
+        }
+      }
+
+      function stopCamera() {
+        if (mediaStream) {
+          mediaStream.getTracks().forEach((t) => t.stop());
+          mediaStream = null;
+        }
+        if (preview.srcObject) preview.srcObject = null;
+      }
+
+      function setReady(blob) {
+        recordedBlob = blob;
+        clearPreviewUrl();
+        stopCamera();
+        previewObjectUrl = URL.createObjectURL(blob);
+        preview.src = previewObjectUrl;
+        preview.muted = true;
+        uploadBtn.disabled = false;
+        recordBtn.disabled = false;
+        pickBtn.disabled = false;
+      }
+
       fileInput.onchange = () => {
         const f = fileInput.files[0];
         if (!f) return;
-        preview.src = URL.createObjectURL(f);
+        recordedBlob = null;
+        clearPreviewUrl();
+        stopCamera();
+        previewObjectUrl = URL.createObjectURL(f);
+        preview.src = previewObjectUrl;
         uploadBtn.disabled = false;
       };
+
+      pickBtn.onclick = () => fileInput.click();
+
+      recordBtn.onclick = async () => {
+        if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+          showResult(document.getElementById(cfg.outId), "Recording is not supported in this browser. Use Upload video instead.");
+          return;
+        }
+        try {
+          mediaStream = await navigator.mediaDevices.getUserMedia({
+            video: { facingMode: { ideal: "environment" } },
+            audio: false,
+          });
+          preview.srcObject = mediaStream;
+          preview.muted = true;
+          await preview.play().catch(() => {});
+          chunks = [];
+          recordedBlob = null;
+          fileInput.value = "";
+          const mime = MediaRecorder.isTypeSupported("video/webm;codecs=vp8")
+            ? "video/webm;codecs=vp8"
+            : MediaRecorder.isTypeSupported("video/webm")
+              ? "video/webm"
+              : "";
+          mediaRecorder = mime ? new MediaRecorder(mediaStream, { mimeType: mime }) : new MediaRecorder(mediaStream);
+          mediaRecorder.ondataavailable = (e) => {
+            if (e.data && e.data.size) chunks.push(e.data);
+          };
+          mediaRecorder.onstop = () => {
+            recordBar.classList.remove("active");
+            const type = mediaRecorder.mimeType || "video/webm";
+            if (chunks.length) setReady(new Blob(chunks, { type }));
+            else {
+              stopCamera();
+              recordBtn.disabled = false;
+              pickBtn.disabled = false;
+            }
+          };
+          mediaRecorder.start(250);
+          recordBar.classList.add("active");
+          recordBtn.disabled = true;
+          pickBtn.disabled = true;
+        } catch (e) {
+          stopCamera();
+          recordBar.classList.remove("active");
+          const out = document.getElementById(cfg.outId);
+          out.style.display = "block";
+          out.className = "result";
+          out.textContent =
+            e.name === "NotAllowedError"
+              ? "Camera permission denied. Allow camera access in your browser settings, or upload a video file."
+              : "Could not open camera: " + (e.message || String(e));
+        }
+      };
+
+      stopRecBtn.onclick = () => {
+        if (mediaRecorder && mediaRecorder.state === "recording") mediaRecorder.stop();
+        else {
+          recordBar.classList.remove("active");
+          stopCamera();
+          recordBtn.disabled = false;
+          pickBtn.disabled = false;
+        }
+      };
+
+      return function getVideoFile() {
+        if (recordedBlob) {
+          const ext = (recordedBlob.type || "").includes("mp4") ? ".mp4" : ".webm";
+          return new File([recordedBlob], "recording" + ext, { type: recordedBlob.type || "video/webm" });
+        }
+        return fileInput.files[0] || null;
+      };
     }
-    wireVideo(document.getElementById("cvWalkFile"), document.getElementById("cvWalkPreview"), document.getElementById("cvWalkUpload"));
-    wireVideo(document.getElementById("cvChairFile"), document.getElementById("cvChairPreview"), document.getElementById("cvChairUpload"));
-    document.getElementById("cvWalkCam").onclick = () => document.getElementById("cvWalkFile").click();
-    document.getElementById("cvChairCam").onclick = () => document.getElementById("cvChairFile").click();
+
+    const getCvWalkFile = setupVideoCapture({
+      fileInput: document.getElementById("cvWalkFile"),
+      preview: document.getElementById("cvWalkPreview"),
+      uploadBtn: document.getElementById("cvWalkUpload"),
+      pickBtn: document.getElementById("cvWalkPick"),
+      recordBtn: document.getElementById("cvWalkRecord"),
+      recordBar: document.getElementById("cvWalkRecordBar"),
+      stopRecBtn: document.getElementById("cvWalkStopRec"),
+      outId: "cvWalkOut",
+    });
+    const getCvChairFile = setupVideoCapture({
+      fileInput: document.getElementById("cvChairFile"),
+      preview: document.getElementById("cvChairPreview"),
+      uploadBtn: document.getElementById("cvChairUpload"),
+      pickBtn: document.getElementById("cvChairPick"),
+      recordBtn: document.getElementById("cvChairRecord"),
+      recordBar: document.getElementById("cvChairRecordBar"),
+      stopRecBtn: document.getElementById("cvChairStopRec"),
+      outId: "cvChairOut",
+    });
 
     document.getElementById("cvWalkUpload").onclick = async () => {
-      const f = document.getElementById("cvWalkFile").files[0];
+      const f = getCvWalkFile();
       const out = document.getElementById("cvWalkOut");
       if (!f) return;
       const form = new FormData();
       form.append("video", f);
       form.append("distance_meters", document.getElementById("cvWalkDist").value || "3.048");
       out.style.display = "block";
+      out.className = "result";
       out.textContent = "Analyzing…";
       try {
         const res = await api("/api/assessments/cv/walk", { method: "POST", body: form });
-        showResult(out, res.scores.label + ": " + res.scores.score + "/100\n" + res.scores.interpretation +
-          "\n\nCV metrics:\n" + JSON.stringify(res.cv, null, 2));
+        showCvSummary(out, res.scores);
         markComplete("cvWalk");
-      } catch (e) { showResult(out, e.message); }
+      } catch (e) {
+        out.className = "result";
+        showResult(out, e.message);
+      }
     };
 
     document.getElementById("cvChairUpload").onclick = async () => {
-      const f = document.getElementById("cvChairFile").files[0];
+      const f = getCvChairFile();
       const out = document.getElementById("cvChairOut");
       if (!f) return;
       const form = new FormData();
       form.append("video", f);
       out.style.display = "block";
+      out.className = "result";
       out.textContent = "Analyzing…";
       try {
         const res = await api("/api/assessments/cv/chair-stand", { method: "POST", body: form });
-        showResult(out, res.scores.label + ": " + res.scores.score + "/100\n" + res.scores.interpretation +
-          "\n\nCV metrics:\n" + JSON.stringify(res.cv, null, 2));
+        showCvSummary(out, res.scores);
         markComplete("cvChair");
-      } catch (e) { showResult(out, e.message); }
+      } catch (e) {
+        out.className = "result";
+        showResult(out, e.message);
+      }
     };
 
     // Profile
@@ -669,32 +863,48 @@
     };
 
     // Chair
-    let chairIv = null, chairLeft = 30, chairReps = 0;
+    let chairState = "idle", chairAccum = 0, chairSegStart = 0, chairTick = null, chairElapsed = null;
+    function chairSeconds() {
+      if (chairState === "running") return chairAccum + (performance.now() - chairSegStart) / 1000;
+      return chairAccum;
+    }
+    function chairRefresh() {
+      document.getElementById("chairTimer").textContent =
+        chairState === "idle" && !chairElapsed ? "—" : chairSeconds().toFixed(2) + "s";
+    }
     document.getElementById("chairStart").onclick = () => {
-      chairLeft = 30; chairReps = 0;
-      document.getElementById("chairTimer").textContent = "30";
-      document.getElementById("chairCount").textContent = "0 stands";
-      document.getElementById("chairPlus").disabled = false;
+      chairState = "running"; chairAccum = 0; chairElapsed = null;
+      chairSegStart = performance.now();
+      document.getElementById("chairStop").disabled = false;
       document.getElementById("saveChair").disabled = true;
       document.getElementById("chairOut").style.display = "none";
-      chairIv = setInterval(() => {
-        chairLeft--;
-        document.getElementById("chairTimer").textContent = chairLeft;
-        if (chairLeft <= 0) {
-          clearInterval(chairIv);
-          document.getElementById("chairPlus").disabled = true;
-          document.getElementById("saveChair").disabled = false;
-        }
-      }, 1000);
+      if (chairTick) clearInterval(chairTick);
+      chairTick = setInterval(chairRefresh, 50);
     };
-    document.getElementById("chairPlus").onclick = () => {
-      chairReps++;
-      document.getElementById("chairCount").textContent = chairReps + " stands";
+    document.getElementById("chairStop").onclick = () => {
+      if (chairState !== "running") return;
+      chairAccum += (performance.now() - chairSegStart) / 1000;
+      chairElapsed = chairAccum;
+      chairState = "stopped";
+      if (chairTick) clearInterval(chairTick);
+      chairRefresh();
+      document.getElementById("chairStop").disabled = true;
+      document.getElementById("saveChair").disabled = false;
+    };
+    document.getElementById("chairReset").onclick = () => {
+      chairState = "idle"; chairAccum = 0; chairElapsed = null;
+      if (chairTick) clearInterval(chairTick);
+      document.getElementById("chairTimer").textContent = "—";
+      document.getElementById("chairStop").disabled = true;
+      document.getElementById("saveChair").disabled = true;
+      document.getElementById("chairOut").style.display = "none";
     };
     document.getElementById("saveChair").onclick = async () => {
       const out = document.getElementById("chairOut");
+      const t = chairElapsed || chairSeconds();
+      if (!t || t < 0.4) { showResult(out, "Time one full stand first."); return; }
       try {
-        const res = await api("/api/assessments/chair-stand", { method: "POST", body: { reps: chairReps } });
+        const res = await api("/api/assessments/chair-stand", { method: "POST", body: { rise_time_seconds: t } });
         showResult(out, res.scores.label + ": " + res.scores.score + "/100\n" + res.scores.interpretation);
         markComplete("chair");
       } catch (e) { showResult(out, e.message); }
@@ -731,6 +941,13 @@
       } catch (e) { out.innerHTML = "<p class='err'>" + e.message + "</p>"; }
     }
     document.getElementById("loadSnap").onclick = loadDashboard;
+
+    fetch("/api/health", { cache: "no-store" })
+      .then((r) => r.json())
+      .then((h) => {
+        if (h.build) document.title = "KinSpan — " + h.build;
+      })
+      .catch(() => {});
   </script>
 </body>
 </html>
