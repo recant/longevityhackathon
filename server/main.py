@@ -244,7 +244,7 @@ def _brand_html(text: str) -> str:
     return text
 
 
-def _ui_file(path: Path) -> FileResponse | HTMLResponse:
+def _ui_file(path: Path) -> Response:
     if path.suffix.lower() == ".html":
         return HTMLResponse(
             _brand_html(path.read_text(encoding="utf-8")),
@@ -254,7 +254,7 @@ def _ui_file(path: Path) -> FileResponse | HTMLResponse:
 
 
 @app.get("/")
-async def root_ui() -> FileResponse | HTMLResponse:
+async def root_ui() -> Response:
     """Longevitree v2 UI integrated with the API."""
     if (V2_DIR / "index.html").is_file():
         return _ui_file(V2_DIR / "index.html")
@@ -264,7 +264,7 @@ async def root_ui() -> FileResponse | HTMLResponse:
 
 
 @app.get("/classic")
-async def classic_ui() -> FileResponse | HTMLResponse:
+async def classic_ui() -> Response:
     """Full guided test UI with video analysis."""
     return _ui_file(LEGACY_UI)
 
