@@ -51,10 +51,15 @@ async function afterAssessmentSaved() {
 
 const API_FETCH = { cache: "no-store" };
 
+function apiErrorMessage(raw) {
+  return typeof formatApiError === "function" ? formatApiError(raw) : String(raw || "");
+}
+
 async function apiGet(path) {
   const r = await fetch(path, API_FETCH);
-  if (!r.ok) throw new Error(await r.text() || r.statusText);
-  return r.json();
+  const text = await r.text();
+  if (!r.ok) throw new Error(apiErrorMessage(text || r.statusText));
+  return text ? JSON.parse(text) : {};
 }
 
 async function apiPost(path, body) {
@@ -64,8 +69,9 @@ async function apiPost(path, body) {
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(body),
   });
-  if (!r.ok) throw new Error(await r.text() || r.statusText);
-  return r.json();
+  const text = await r.text();
+  if (!r.ok) throw new Error(apiErrorMessage(text || r.statusText));
+  return text ? JSON.parse(text) : {};
 }
 
 async function apiPut(path, body) {
@@ -75,8 +81,9 @@ async function apiPut(path, body) {
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(body),
   });
-  if (!r.ok) throw new Error(await r.text() || r.statusText);
-  return r.json();
+  const text = await r.text();
+  if (!r.ok) throw new Error(apiErrorMessage(text || r.statusText));
+  return text ? JSON.parse(text) : {};
 }
 
 function showResult(el, text) {

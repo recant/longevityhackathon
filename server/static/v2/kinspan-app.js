@@ -47,10 +47,15 @@ function withProfile(path) {
   return `${path}${sep}profile_id=${encodeURIComponent(id)}`;
 }
 
+function apiErrorMessage(raw) {
+  return typeof formatApiError === "function" ? formatApiError(raw) : String(raw || "");
+}
+
 async function apiGet(path) {
   const r = await fetch(withProfile(path), API_FETCH);
-  if (!r.ok) throw new Error(await r.text() || r.statusText);
-  return r.json();
+  const text = await r.text();
+  if (!r.ok) throw new Error(apiErrorMessage(text || r.statusText));
+  return text ? JSON.parse(text) : {};
 }
 
 async function apiPost(path, body) {
@@ -60,8 +65,9 @@ async function apiPost(path, body) {
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(body),
   });
-  if (!r.ok) throw new Error(await r.text() || r.statusText);
-  return r.json();
+  const text = await r.text();
+  if (!r.ok) throw new Error(apiErrorMessage(text || r.statusText));
+  return text ? JSON.parse(text) : {};
 }
 
 async function apiPut(path, body) {
@@ -71,8 +77,9 @@ async function apiPut(path, body) {
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(body),
   });
-  if (!r.ok) throw new Error(await r.text() || r.statusText);
-  return r.json();
+  const text = await r.text();
+  if (!r.ok) throw new Error(apiErrorMessage(text || r.statusText));
+  return text ? JSON.parse(text) : {};
 }
 
 function fmtDate(iso) {
@@ -551,7 +558,7 @@ function setupWalk() {
       await afterAssessmentSaved();
     } catch (e) {
       if (out) {
-        out.textContent = e.message;
+        out.textContent = apiErrorMessage(e.message);
         out.classList.add("show");
       }
     }
@@ -623,7 +630,7 @@ function setupChairRise() {
       await afterAssessmentSaved();
     } catch (e) {
       if (out) {
-        out.textContent = e.message;
+        out.textContent = apiErrorMessage(e.message);
         out.classList.add("show");
       }
     }
@@ -711,7 +718,7 @@ function setupReaction() {
       await afterAssessmentSaved();
     } catch (e) {
       if (out) {
-        out.textContent = e.message;
+        out.textContent = apiErrorMessage(e.message);
         out.classList.add("show");
       }
     }
@@ -781,8 +788,9 @@ function setupProfile() {
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify(body),
         });
-        if (!r.ok) throw new Error(await r.text() || r.statusText);
-        p = await r.json();
+        const text = await r.text();
+        if (!r.ok) throw new Error(apiErrorMessage(text || r.statusText));
+        p = text ? JSON.parse(text) : {};
         setActiveProfileId(p.id);
         profileCreateMode = false;
         profileEditingId = null;
@@ -809,7 +817,7 @@ function setupProfile() {
       setTimeout(() => goTo("dashboard"), 600);
     } catch (e) {
       if (out) {
-        out.textContent = e.message;
+        out.textContent = apiErrorMessage(e.message);
         out.classList.add("show");
       }
     }

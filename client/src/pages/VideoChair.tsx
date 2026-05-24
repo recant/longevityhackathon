@@ -1,6 +1,7 @@
 import { useRef, useState } from "react";
 import { Link } from "react-router-dom";
 import type { CategoryScore } from "../api";
+import { formatApiError } from "../formatApiError";
 
 type Props = { embedded?: boolean; onSaved?: () => void };
 
@@ -26,8 +27,9 @@ export default function VideoChair({ embedded, onSaved }: Props = {}) {
     form.append("video", file, "chair.webm");
     try {
       const res = await fetch("/api/assessments/cv/chair-stand", { method: "POST", body: form });
-      if (!res.ok) throw new Error(await res.text());
-      const data = await res.json();
+      const text = await res.text();
+      if (!res.ok) throw new Error(formatApiError(text || res.statusText));
+      const data = text ? JSON.parse(text) : {};
       setScores(data.scores);
       setCv(data.cv);
       onSaved?.();

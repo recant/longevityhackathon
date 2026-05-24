@@ -1,3 +1,5 @@
+import { formatApiError } from "./formatApiError";
+
 export type Profile = {
   id: number;
   display_name: string;
@@ -61,11 +63,11 @@ export type ScoredSession = {
 };
 
 async function json<T>(res: Response): Promise<T> {
+  const text = await res.text();
   if (!res.ok) {
-    const text = await res.text();
-    throw new Error(text || res.statusText);
+    throw new Error(formatApiError(text || res.statusText));
   }
-  return res.json() as Promise<T>;
+  return (text ? JSON.parse(text) : {}) as T;
 }
 
 export async function getProfile(): Promise<Profile> {

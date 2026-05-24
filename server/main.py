@@ -223,6 +223,16 @@ async def classic_ui() -> FileResponse:
     return _ui_file(LEGACY_UI)
 
 
+@app.get("/format-api-error.js")
+async def format_api_error_js() -> FileResponse:
+    """Shared plain-English formatter for API error JSON."""
+    return FileResponse(
+        STATIC_DIR / "format-api-error.js",
+        media_type="application/javascript",
+        headers={"Cache-Control": "no-store, no-cache, must-revalidate"},
+    )
+
+
 @app.get("/v2")
 async def v2_ui_redirect() -> RedirectResponse:
     """Longevity App v2 (same UI as /)."""

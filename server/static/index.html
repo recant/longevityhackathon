@@ -251,6 +251,7 @@
     </div>
   </div>
 
+  <script src="/format-api-error.js"></script>
   <script>
     const API = "";
     async function api(path, opts = {}) {
@@ -262,7 +263,7 @@
           ? JSON.stringify(opts.body) : opts.body,
       });
       const text = await r.text();
-      if (!r.ok) throw new Error(text || r.statusText);
+      if (!r.ok) throw new Error(formatApiError(text || r.statusText));
       return text ? JSON.parse(text) : {};
     }
 
@@ -681,14 +682,19 @@
     document.getElementById("saveProfile").onclick = async () => {
       const out = document.getElementById("profileOut");
       try {
-        const p = await api("/api/profile", {
-          method: "PUT",
-          body: {
-            display_name: document.getElementById("pName").value,
-            age: +document.getElementById("pAge").value,
-            sex: document.getElementById("pSex").value,
-          },
-        });
+        const body = {
+          display_name: document.getElementById("pName").value,
+          age: +document.getElementById("pAge").value,
+          sex: document.getElementById("pSex").value,
+        };
+        let p;
+        try {
+          p = await api("/api/profile", { method: "PUT", body });
+        } catch (e) {
+          if ((e.message || "").includes("No parent profile")) {
+            p = await api("/api/profiles", { method: "POST", body });
+          } else throw e;
+        }
         showResult(out, "Saved: " + p.display_name + ", age " + p.age);
         markComplete("profile");
       } catch (e) { showResult(out, e.message); }
