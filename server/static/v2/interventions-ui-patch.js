@@ -1,11 +1,11 @@
 /**
- * Reversible UI patch: prefer citation-backed /api/snapshot.interventions
- * over the legacy /api/snapshot.actions display without deleting the old code.
+ * Reversible UI patch for the v2 app.
+ * - Prefer citation-backed /api/snapshot.interventions over legacy actions.
+ * - Show compact citations only: author + paper title, no DOI/URL in the UI.
+ * - Add local intervention selection/adherence tracking and graph markers.
+ * - Support pitch demo mode with ?demo=1.
  *
- * Also supports pitch demo mode with seeded graph data when the URL includes ?demo=1.
- * Adds local-only intervention selection/adherence tracking for pitch/demo use.
- *
- * Remove this file and its script tag to return to the old actions-only UI.
+ * Remove this file and its script tag to return to the original UI behavior.
  */
 (function () {
   const FETCH_OPTS = { cache: 'no-store' };
@@ -61,15 +61,14 @@
   }
 
   function graphPointCount() {
-    const chart = typeof Chart !== 'undefined' ? Chart.getChart(document.getElementById('vitalityChart')) : null;
+    const canvas = document.getElementById('vitalityChart');
+    const chart = typeof Chart !== 'undefined' && canvas ? Chart.getChart(canvas) : null;
     const data = chart?.data?.datasets?.[0]?.data || [];
-    if (data.length) return data.length;
-    // The default v2 graph mainly uses gait sessions. Before the chart exists, use a safe 0 baseline.
-    return 0;
+    return data.length || 0;
   }
 
   function interventionId(item) {
-    const raw = `${item.title || 'intervention'}|${item.citation?.doi || item.citation?.short || ''}`;
+    const raw = `${item.id || item.title || 'intervention'}|${item.citation?.short || ''}`;
     return raw.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '').slice(0, 80);
   }
 
@@ -77,18 +76,26 @@
     return new Set(getPlan().filter((p) => !p.stoppedAt).map((p) => p.id));
   }
 
+  function compactCitation(citation) {
+    if (!citation) return 'Peer-reviewed source';
+    if (citation.display) return citation.display;
+    if (citation.short) return citation.short;
+    if (citation.full) {
+      const parts = String(citation.full).split('.');
+      const authors = parts[0]?.trim() || 'Peer-reviewed source';
+      const title = parts[1]?.trim();
+      return title ? `${authors}, ${title}` : authors;
+    }
+    return 'Peer-reviewed source';
+  }
+
   function citationHtml(citation) {
-    if (!citation) return '';
-    const label = citation.short || citation.full || 'Peer-reviewed citation';
-    const doi = citation.doi
-      ? ` <span class="task-sub">DOI: <a href="${escapeHtml(citation.url || `https://doi.org/${citation.doi}`)}" target="_blank" rel="noreferrer">${escapeHtml(citation.doi)}</a></span>`
-      : '';
-    return `<p class="task-sub"><strong>Evidence:</strong> ${escapeHtml(label)}${doi}</p>`;
+    return `<p class="ks-citation"><strong>Evidence:</strong> ${escapeHtml(compactCitation(citation))}</p>`;
   }
 
   function interventionHtml(item) {
     return `
-      <li class="task-item-static" data-source="intervention">
+      <li class="task-item-static ks-intervention-card" data-source="intervention">
         <strong>${escapeHtml(item.title)}</strong>
         <p class="task-sub">${escapeHtml(item.suggestion)}</p>
         ${item.rationale ? `<p class="task-sub"><strong>Why:</strong> ${escapeHtml(item.rationale)}</p>` : ''}
@@ -98,10 +105,13 @@
   }
 
   function fallbackActionHtml(action) {
+    const detail = String(action.detail || '')
+      .replace(/\s*DOI:\s*[^\s]+/gi, '')
+      .replace(/\s*Source:\s*https?:\/\/\S+/gi, '');
     return `
-      <li class="task-item-static" data-source="legacy-action">
+      <li class="task-item-static ks-intervention-card" data-source="legacy-action">
         <strong>${escapeHtml(action.title)}</strong>
-        <p class="task-sub">${escapeHtml(action.detail)}</p>
+        <p class="task-sub">${escapeHtml(detail)}</p>
       </li>
     `;
   }
@@ -110,32 +120,29 @@
     if (!interventions?.length) return '';
     const active = activePlanIds();
     const plan = getPlan().filter((p) => !p.stoppedAt);
-    const currentCount = totalCheckins(snap);
-    const rows = interventions
-      .map((item, index) => {
-        const id = interventionId(item);
-        const already = active.has(id);
-        return `
-          <label class="ks-plan-option">
-            <input type="checkbox" data-ks-intervention-choice="1" data-index="${index}" ${already ? 'checked' : ''} />
-            <span>
-              <strong>${escapeHtml(item.title)}</strong>
-              <small>${already ? 'Already in current plan' : 'Start tracking this intervention'}</small>
-            </span>
-          </label>
-        `;
-      })
-      .join('');
+    const rows = interventions.map((item, index) => {
+      const id = interventionId(item);
+      const already = active.has(id);
+      return `
+        <label class="ks-plan-option">
+          <input type="checkbox" data-ks-intervention-choice="1" data-index="${index}" ${already ? 'checked' : ''} />
+          <span>
+            <strong>${escapeHtml(item.title)}</strong>
+            <small>${already ? 'Already in current plan' : 'Start tracking this intervention'}</small>
+          </span>
+        </label>
+      `;
+    }).join('');
 
     const activeSummary = plan.length
-      ? `<div class="ks-plan-active"><strong>Currently tracking:</strong> ${plan.map((p) => escapeHtml(p.title)).join(', ')}<br><small>Confirmed adherence will appear as a vertical marker on the Progress graph.</small></div>`
+      ? `<div class="ks-plan-active"><strong>Currently tracking:</strong> ${plan.map((p) => escapeHtml(p.title)).join(', ')}<br><small>Confirmed adherence appears as a vertical marker on the Progress graph.</small></div>`
       : '';
 
     return `
       <li class="task-item-static ks-plan-box" data-source="intervention-selector">
         <strong>Choose interventions to start</strong>
         <p class="task-sub">Select one or more habits. Next time you begin a test session, the app will ask whether you actually did them since the previous check-in.</p>
-        <div class="ks-plan-options" data-current-count="${currentCount}">${rows}</div>
+        <div class="ks-plan-options" data-current-count="${totalCheckins(snap)}">${rows}</div>
         <button type="button" class="ks-plan-btn" id="ksStartInterventions">Start selected interventions</button>
         <button type="button" class="ks-plan-clear" id="ksClearInterventions">Clear tracked interventions</button>
         <p class="task-sub" id="ksPlanStatus"></p>
@@ -159,11 +166,12 @@
       return;
     }
 
+    window.__ksLatestSnapshot = snap;
+    window.__ksLatestInterventions = snap.interventions || [];
+
     const taskList = document.getElementById('taskList');
     if (taskList) {
       const interventions = snap.interventions || [];
-      window.__ksLatestInterventions = interventions;
-      window.__ksLatestSnapshot = snap;
       if (interventions.length) {
         taskList.innerHTML = interventions.map(interventionHtml).join('') + interventionChecklistHtml(interventions, snap);
       } else if (!taskList.children.length && snap.actions?.length) {
@@ -176,7 +184,7 @@
     if (digestAction && first) {
       digestAction.innerHTML = `
         ${escapeHtml(first.suggestion)}
-        <br><br><span style="font-size:11px;opacity:.78"><strong>Evidence:</strong> ${escapeHtml(first.citation?.short || 'Peer-reviewed citation')}${first.citation?.doi ? ` · DOI: ${escapeHtml(first.citation.doi)}` : ''}</span>
+        <br><br><span class="ks-citation"><strong>Evidence:</strong> ${escapeHtml(compactCitation(first.citation))}</span>
       `;
     }
   }
@@ -208,8 +216,7 @@
         id,
         title: item.title || 'Intervention',
         suggestion: item.suggestion || '',
-        citationShort: item.citation?.short || '',
-        citationDoi: item.citation?.doi || '',
+        citationLabel: compactCitation(item.citation),
         startedAt: now,
         startCheckinCount: currentCount,
         startGraphIndex,
@@ -233,10 +240,10 @@
 
   function demoInterventionHtml() {
     return `
-      <li class="task-item-static" data-source="demo-intervention" id="demoInterventionTask">
+      <li class="task-item-static ks-intervention-card" data-source="demo-intervention" id="demoInterventionTask">
         <strong>Demo intervention: daily walk + breakfast sit-to-stands</strong>
-        <p class="task-sub">Started after Week 4. The graph shows an observed improvement after this habit began; for the pitch, describe this as a trajectory signal, not proof of causation.</p>
-        <p class="task-sub"><strong>Evidence:</strong> Pahor et al., JAMA 2014 · DOI: 10.1001/jama.2014.5616</p>
+        <p class="task-sub">Started after Week 4. The graph shows an observed improvement after this habit began; describe this as a trajectory signal, not proof of causation.</p>
+        <p class="ks-citation"><strong>Evidence:</strong> Pahor et al., Effect of Structured Physical Activity</p>
       </li>
     `;
   }
@@ -253,7 +260,7 @@
     if (!graphSection || document.getElementById('demoInterventionNote')) return;
     const note = document.createElement('div');
     note.id = 'demoInterventionNote';
-    note.className = 'graph-card';
+    note.className = 'graph-card ks-wrap-card';
     note.innerHTML = `
       <h3>Intervention started after Week 4</h3>
       <p class="g-sub">Daily walk + breakfast sit-to-stands</p>
@@ -283,22 +290,16 @@
 
   function drawDemoMarker(chart) {
     const idx = DEMO_POINTS.findIndex((p) => p.intervention);
-    if (idx < 0) return;
     const point = chart.getDatasetMeta(0)?.data?.[idx];
-    if (!point) return;
-    drawVerticalMarker(chart, point.x, 'Intervention', '#B07560');
+    if (point) drawVerticalMarker(chart, point.x, 'Intervention', '#B07560');
   }
 
-  const demoMarkerPlugin = {
-    id: 'demoInterventionMarker',
-    afterDatasetsDraw: drawDemoMarker,
-  };
+  const demoMarkerPlugin = { id: 'demoInterventionMarker', afterDatasetsDraw: drawDemoMarker };
 
   function renderDemoGraph() {
     if (!DEMO_MODE) return;
     installDemoTag();
     ensureDemoNote();
-
     const canvas = document.getElementById('vitalityChart');
     if (!canvas || typeof Chart === 'undefined') return;
     const existing = Chart.getChart(canvas);
@@ -308,49 +309,27 @@
       type: 'line',
       data: {
         labels: DEMO_POINTS.map((p) => p.label),
-        datasets: [
-          {
-            label: 'Demo functional score',
-            data: DEMO_POINTS.map((p) => p.score),
-            borderColor: '#6B8F71',
-            backgroundColor: 'rgba(107,143,113,0.09)',
-            pointBackgroundColor: DEMO_POINTS.map((p) => (p.intervention ? '#B07560' : '#6B8F71')),
-            pointBorderColor: '#ffffff',
-            pointBorderWidth: 2,
-            pointRadius: DEMO_POINTS.map((p) => (p.intervention ? 7 : 5)),
-            borderWidth: 2.5,
-            tension: 0.35,
-            fill: true,
-          },
-        ],
+        datasets: [{
+          label: 'Demo functional score',
+          data: DEMO_POINTS.map((p) => p.score),
+          borderColor: '#6B8F71',
+          backgroundColor: 'rgba(107,143,113,0.09)',
+          pointBackgroundColor: DEMO_POINTS.map((p) => (p.intervention ? '#B07560' : '#6B8F71')),
+          pointBorderColor: '#ffffff',
+          pointBorderWidth: 2,
+          pointRadius: DEMO_POINTS.map((p) => (p.intervention ? 7 : 5)),
+          borderWidth: 2.5,
+          tension: 0.35,
+          fill: true,
+        }],
       },
       options: {
         responsive: true,
         maintainAspectRatio: false,
-        plugins: {
-          legend: { display: false },
-          tooltip: {
-            callbacks: {
-              label: (ctx) => {
-                const pt = DEMO_POINTS[ctx.dataIndex];
-                return pt.intervention
-                  ? ` Score: ${pt.score} — intervention started`
-                  : ` Score: ${pt.score}`;
-              },
-            },
-          },
-        },
+        plugins: { legend: { display: false } },
         scales: {
-          y: {
-            min: 45,
-            max: 90,
-            ticks: { color: '#7A8C82', font: { size: 10 } },
-            grid: { color: 'rgba(0,0,0,0.04)' },
-          },
-          x: {
-            ticks: { color: '#7A8C82', font: { size: 10 } },
-            grid: { display: false },
-          },
+          y: { min: 45, max: 90, ticks: { color: '#7A8C82', font: { size: 10 } }, grid: { color: 'rgba(0,0,0,0.04)' } },
+          x: { ticks: { color: '#7A8C82', font: { size: 10 } }, grid: { display: false } },
         },
       },
       plugins: [demoMarkerPlugin],
@@ -360,22 +339,16 @@
     if (metricVals[0]) metricVals[0].textContent = '77';
     if (metricVals[1]) metricVals[1].textContent = '77';
     if (metricVals[2]) metricVals[2].textContent = '+19';
-
     const metricDeltas = document.querySelectorAll('#graphs .m-delta');
     if (metricDeltas[0]) metricDeltas[0].textContent = '+4 ↑';
     if (metricDeltas[1]) metricDeltas[1].textContent = 'Today';
     if (metricDeltas[2]) metricDeltas[2].textContent = 'after plan';
-
     const bioExp = document.getElementById('bioExpText');
-    if (bioExp) {
-      bioExp.innerHTML = 'Demo narrative: after the family began a simple daily walking + sit-to-stand habit, the functional score moved from the high 50s to the high 70s over the following check-ins.';
-    }
+    if (bioExp) bioExp.innerHTML = 'Demo narrative: after the family began a simple daily walking + sit-to-stand habit, the functional score moved from the high 50s to the high 70s over the following check-ins.';
     const fill = document.getElementById('bioFill');
     if (fill) {
       fill.style.width = '0%';
-      setTimeout(() => {
-        fill.style.width = '77%';
-      }, 150);
+      setTimeout(() => { fill.style.width = '77%'; }, 150);
     }
   }
 
@@ -387,7 +360,7 @@
     }
     const digestAction = document.getElementById('digestAction');
     if (digestAction) {
-      digestAction.innerHTML = 'Continue the daily walk + breakfast sit-to-stand habit this week.<br><br><span style="font-size:11px;opacity:.78"><strong>Demo evidence:</strong> Pahor et al., JAMA 2014 · DOI: 10.1001/jama.2014.5616</span>';
+      digestAction.innerHTML = 'Continue the daily walk + breakfast sit-to-stand habit this week.<br><br><span class="ks-citation"><strong>Evidence:</strong> Pahor et al., Effect of Structured Physical Activity</span>';
     }
   }
 
@@ -399,29 +372,24 @@
     const graphSection = document.querySelector('#graphs .graph-section');
     if (!graphSection) return;
     let note = document.getElementById('ksPlanProgressNote');
-    if (!items.length) {
-      note?.remove();
-      return;
-    }
+    if (!items.length) { note?.remove(); return; }
     if (!note) {
       note = document.createElement('div');
       note.id = 'ksPlanProgressNote';
-      note.className = 'graph-card';
+      note.className = 'graph-card ks-wrap-card';
       graphSection.insertBefore(note, graphSection.children[1] || null);
     }
     const data = chart?.data?.datasets?.[0]?.data || [];
-    const rows = items
-      .map((item) => {
-        const idx = Math.max(0, Math.min(Number(item.startGraphIndex || 0), Math.max(0, data.length - 1)));
-        const start = data[idx];
-        const latest = data[data.length - 1];
-        const delta = Number.isFinite(Number(start)) && Number.isFinite(Number(latest)) ? Math.round(Number(latest) - Number(start)) : null;
-        return `<li><strong>${escapeHtml(item.title)}</strong> — started ${new Date(item.startedAt).toLocaleDateString()}${delta == null ? '' : `; score change after start: ${delta >= 0 ? '+' : ''}${delta}`}</li>`;
-      })
-      .join('');
+    const rows = items.map((item) => {
+      const idx = Math.max(0, Math.min(Number(item.startGraphIndex || 0), Math.max(0, data.length - 1)));
+      const start = data[idx];
+      const latest = data[data.length - 1];
+      const delta = Number.isFinite(Number(start)) && Number.isFinite(Number(latest)) ? Math.round(Number(latest) - Number(start)) : null;
+      return `<li><strong>${escapeHtml(item.title)}</strong> — started ${new Date(item.startedAt).toLocaleDateString()}${delta == null ? '' : `; score change after start: ${delta >= 0 ? '+' : ''}${delta}`}</li>`;
+    }).join('');
     note.innerHTML = `
       <h3>Intervention markers</h3>
-      <p class="g-sub">These vertical lines show when a selected habit plan started. They show timing, not proof of causation.</p>
+      <p class="g-sub">Vertical lines show when a selected habit plan started. They show timing, not proof of causation.</p>
       <ul class="ks-plan-progress-list">${rows}</ul>
     `;
   }
@@ -433,17 +401,12 @@
     const items = confirmedPlanItems();
     ensurePlanProgressNote(items, chart);
     if (!chart || !items.length) return;
-
     const data = chart.data?.datasets?.[0]?.data || [];
     if (!data.length) return;
-    const area = chart.chartArea;
-    if (!area) return;
-
     items.forEach((item, i) => {
       const idx = Math.max(0, Math.min(Number(item.startGraphIndex || 0), data.length - 1));
       const point = chart.getDatasetMeta(0)?.data?.[idx];
-      if (!point) return;
-      drawVerticalMarker(chart, point.x, i === 0 ? 'Started' : `Start ${i + 1}`, '#B07560');
+      if (point) drawVerticalMarker(chart, point.x, i === 0 ? 'Started' : `Start ${i + 1}`, '#B07560');
     });
   }
 
@@ -463,31 +426,24 @@
     try {
       snap = await loadSnapshot();
       window.__ksLatestSnapshot = snap;
-    } catch (_) {
-      // Use cached snapshot if available.
-    }
+    } catch (_) {}
     if (!adherencePromptNeeded(snap)) return;
-
     const plan = getPlan().filter((p) => !p.stoppedAt);
     if (!plan.length || document.getElementById('ksAdherenceOverlay')) return;
 
-    const rows = plan
-      .map(
-        (item, index) => `
-          <label class="ks-adherence-option">
-            <input type="checkbox" data-ks-adherence-choice="1" data-index="${index}" />
-            <span><strong>${escapeHtml(item.title)}</strong><small>I did this since the previous session</small></span>
-          </label>
-        `
-      )
-      .join('');
+    const rows = plan.map((item, index) => `
+      <label class="ks-adherence-option">
+        <input type="checkbox" data-ks-adherence-choice="1" data-index="${index}" />
+        <span><strong>${escapeHtml(item.title)}</strong><small>I did this since the previous session</small></span>
+      </label>
+    `).join('');
 
     const overlay = document.createElement('div');
     overlay.id = 'ksAdherenceOverlay';
     overlay.innerHTML = `
       <div class="ks-adherence-card">
         <h3>Since your last session…</h3>
-        <p>Which selected interventions have you actually been doing? Confirmed interventions will appear as vertical markers on the Progress graph.</p>
+        <p>Which selected interventions have you actually been doing? Confirmed interventions appear as vertical markers on the Progress graph.</p>
         <div>${rows}</div>
         <div class="ks-adherence-actions">
           <button type="button" id="ksSaveAdherence">Save</button>
@@ -500,23 +456,14 @@
 
   function saveAdherenceFromPrompt(keptAny) {
     const overlay = document.getElementById('ksAdherenceOverlay');
-    const snap = window.__ksLatestSnapshot || null;
-    const currentCount = totalCheckins(snap);
+    const currentCount = totalCheckins(window.__ksLatestSnapshot || null);
     const now = new Date().toISOString();
-    const kept = new Set(
-      keptAny
-        ? [...document.querySelectorAll('[data-ks-adherence-choice]:checked')].map((input) => Number(input.dataset.index))
-        : []
-    );
-
+    const kept = new Set(keptAny ? [...document.querySelectorAll('[data-ks-adherence-choice]:checked')].map((input) => Number(input.dataset.index)) : []);
     const plan = getPlan().filter((p) => !p.stoppedAt).map((item, index) => ({
       ...item,
       lastAskedAt: now,
       lastAskedCheckinCount: currentCount,
-      adherenceLog: [
-        ...(item.adherenceLog || []),
-        { at: now, checkinCount: currentCount, kept: kept.has(index) },
-      ],
+      adherenceLog: [...(item.adherenceLog || []), { at: now, checkinCount: currentCount, kept: kept.has(index) }],
     }));
     savePlan(plan);
     sessionStorage.setItem(SESSION_PROMPT_KEY, '1');
@@ -529,79 +476,59 @@
     const style = document.createElement('style');
     style.id = 'ksInterventionPatchStyles';
     style.textContent = `
-      .ks-plan-box{background:#fffdf9;border-left:4px solid #B07560!important}
-      .ks-plan-options{display:flex;flex-direction:column;gap:8px;margin:10px 0}
-      .ks-plan-option,.ks-adherence-option{display:flex;gap:9px;align-items:flex-start;background:rgba(107,143,113,.09);border-radius:12px;padding:9px 10px;font-size:12px;color:var(--text,#2C3530)}
+      .task-list-api,.task-list-api *,.ks-wrap-card,.ks-wrap-card *{max-width:100%;box-sizing:border-box;overflow-wrap:anywhere;word-break:normal;white-space:normal}
+      .ks-intervention-card{overflow:hidden;max-width:100%}
+      .ks-intervention-card strong{display:block;line-height:1.35}
+      .ks-intervention-card .task-sub{font-size:12px;line-height:1.5;overflow-wrap:anywhere;word-break:normal}
+      .ks-citation{display:block;margin-top:7px;font-size:10.5px!important;line-height:1.35;color:var(--text-muted,#7A8C82);overflow-wrap:anywhere;word-break:normal}
+      .ks-plan-box{background:#fffdf9;border-left:4px solid #B07560!important;overflow:hidden}
+      .ks-plan-options{display:flex;flex-direction:column;gap:8px;margin:10px 0;max-width:100%}
+      .ks-plan-option,.ks-adherence-option{display:flex;gap:9px;align-items:flex-start;background:rgba(107,143,113,.09);border-radius:12px;padding:9px 10px;font-size:12px;color:var(--text,#2C3530);max-width:100%;overflow:hidden}
       .ks-plan-option input,.ks-adherence-option input{margin-top:3px;accent-color:#6B8F71;flex-shrink:0}
-      .ks-plan-option span,.ks-adherence-option span{display:flex;flex-direction:column;gap:2px;line-height:1.35}
-      .ks-plan-option small,.ks-adherence-option small{color:var(--text-muted,#7A8C82);font-size:11px}
-      .ks-plan-btn,.ks-plan-clear,.ks-adherence-actions button{border:0;border-radius:12px;padding:9px 12px;font-family:'DM Sans',sans-serif;font-size:12px;font-weight:600;cursor:pointer;margin:4px 6px 0 0}
+      .ks-plan-option span,.ks-adherence-option span{display:flex;flex-direction:column;gap:2px;line-height:1.35;min-width:0;max-width:100%}
+      .ks-plan-option small,.ks-adherence-option small{color:var(--text-muted,#7A8C82);font-size:11px;overflow-wrap:anywhere}
+      .ks-plan-btn,.ks-plan-clear,.ks-adherence-actions button{border:0;border-radius:12px;padding:9px 12px;font-family:'DM Sans',sans-serif;font-size:12px;font-weight:600;cursor:pointer;margin:4px 6px 0 0;max-width:100%}
       .ks-plan-btn,.ks-adherence-actions button:first-child{background:#6B8F71;color:white}
       .ks-plan-clear,.ks-adherence-actions button:last-child{background:#E8F0E9;color:#4A6B51}
-      .ks-plan-active{margin-top:10px;border-radius:12px;background:#E8F0E9;padding:10px 11px;font-size:12px;line-height:1.45;color:#4A6B51}
+      .ks-plan-active{margin-top:10px;border-radius:12px;background:#E8F0E9;padding:10px 11px;font-size:12px;line-height:1.45;color:#4A6B51;overflow-wrap:anywhere}
       #ksAdherenceOverlay{position:absolute;inset:0;background:rgba(0,0,0,.45);z-index:60;display:flex;align-items:center;justify-content:center;padding:22px}
-      .ks-adherence-card{background:white;border-radius:24px;padding:22px;box-shadow:0 24px 70px rgba(0,0,0,.25);max-width:340px;width:100%}
+      .ks-adherence-card{background:white;border-radius:24px;padding:22px;box-shadow:0 24px 70px rgba(0,0,0,.25);max-width:340px;width:100%;overflow:hidden}
       .ks-adherence-card h3{font-family:'Lora',serif;font-size:20px;margin:0 0 8px;color:var(--text,#2C3530)}
-      .ks-adherence-card p{font-size:13px;color:var(--text-muted,#7A8C82);line-height:1.55;margin:0 0 12px}
+      .ks-adherence-card p{font-size:13px;color:var(--text-muted,#7A8C82);line-height:1.55;margin:0 0 12px;overflow-wrap:anywhere}
       .ks-adherence-actions{display:flex;gap:8px;margin-top:12px}
       .ks-adherence-actions button{flex:1;margin:0;padding:12px}
-      .ks-plan-progress-list{padding-left:18px;margin:8px 0 0;color:var(--text,#2C3530);font-size:12px;line-height:1.55}
+      .ks-plan-progress-list{padding-left:18px;margin:8px 0 0;color:var(--text,#2C3530);font-size:12px;line-height:1.55;overflow-wrap:anywhere}
     `;
     document.head.appendChild(style);
   }
 
   function completeEmbeddedGuidedCheckin() {
-    try {
-      window.postMessage({ type: 'kinspan:assessment-saved' }, location.origin);
-    } catch (_) {
-      // no-op
-    }
-    Promise.resolve()
-      .then(() => loadSnapshot())
-      .catch(() => null)
-      .finally(() => {
-        if (typeof window.goTo === 'function') {
-          window.goTo('dashboard');
-        }
-      });
+    try { window.postMessage({ type: 'kinspan:assessment-saved' }, location.origin); } catch (_) {}
+    Promise.resolve().then(() => loadSnapshot()).catch(() => null).finally(() => {
+      if (typeof window.goTo === 'function') window.goTo('dashboard');
+    });
   }
 
   function patchGuidedFinishButton() {
     const frame = document.getElementById('guidedFrame');
     if (!frame) return;
-
     const apply = () => {
       let doc;
-      try {
-        doc = frame.contentDocument || frame.contentWindow?.document;
-      } catch (_) {
-        return;
-      }
+      try { doc = frame.contentDocument || frame.contentWindow?.document; } catch (_) { return; }
       if (!doc) return;
-
       const btn = doc.getElementById('wfContinue');
       if (!btn || btn.dataset.parentFinishPatch === '1') return;
       btn.dataset.parentFinishPatch = '1';
-
-      btn.addEventListener(
-        'click',
-        (event) => {
-          const label = String(btn.textContent || '').trim().toLowerCase();
-          const resultsShown = doc.getElementById('dash')?.classList.contains('show');
-          if (label !== 'finish' && !resultsShown) return;
-
-          event.preventDefault();
-          event.stopImmediatePropagation();
-          completeEmbeddedGuidedCheckin();
-        },
-        true
-      );
+      btn.addEventListener('click', (event) => {
+        const label = String(btn.textContent || '').trim().toLowerCase();
+        const resultsShown = doc.getElementById('dash')?.classList.contains('show');
+        if (label !== 'finish' && !resultsShown) return;
+        event.preventDefault();
+        event.stopImmediatePropagation();
+        completeEmbeddedGuidedCheckin();
+      }, true);
     };
-
-    frame.addEventListener('load', () => {
-      setTimeout(apply, 150);
-      setTimeout(apply, 600);
-    });
+    frame.addEventListener('load', () => { setTimeout(apply, 150); setTimeout(apply, 600); });
     setTimeout(apply, 150);
     setTimeout(apply, 600);
   }
@@ -622,10 +549,7 @@
     window.goTo = function patchedGoTo(id) {
       const result = oldGoTo.apply(this, arguments);
       if (id === 'dashboard' || id === 'weekly-digest') scheduleRender();
-      if (id === 'graphs') {
-        scheduleDemoGraph();
-        schedulePlanGraphMarkers();
-      }
+      if (id === 'graphs') { scheduleDemoGraph(); schedulePlanGraphMarkers(); }
       if (id === 'guided') patchGuidedFinishButton();
       if (['tests', 'walk', 'sit-stand', 'reaction', 'chair-rise', 'guided'].includes(id)) {
         setTimeout(maybeAskAdherence, 250);
@@ -659,19 +583,10 @@
   });
 
   document.addEventListener('DOMContentLoaded', () => {
-    installStyles();
-    scheduleRender();
-    installDemoTag();
-    scheduleDemoGraph();
-    schedulePlanGraphMarkers();
-    patchGuidedFinishButton();
+    installStyles(); scheduleRender(); installDemoTag(); scheduleDemoGraph(); schedulePlanGraphMarkers(); patchGuidedFinishButton();
   });
   window.addEventListener('focus', () => {
-    installStyles();
-    scheduleRender();
-    scheduleDemoGraph();
-    schedulePlanGraphMarkers();
-    patchGuidedFinishButton();
+    installStyles(); scheduleRender(); scheduleDemoGraph(); schedulePlanGraphMarkers(); patchGuidedFinishButton();
   });
   installStyles();
   scheduleRender();
