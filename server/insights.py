@@ -23,10 +23,7 @@ def _mock_insight(profile: dict[str, Any], snapshot: dict[str, Any]) -> dict[str
             f"{name}'s check-ins are saved. Set ANTHROPIC_API_KEY, OLLAMA_API_KEY, or OPENAI_API_KEY "
             "for personalized 'explain like a caring family member' text."
         ),
-        "conversation_tip": (
-            "Use this as a low-pressure family check-in: focus on energy, movement, and small habits "
-            "over time rather than turning the conversation into a medical evaluation."
-        ),
+        "conversation_tip": "",
         "what_changed": what,
         "mock": True,
     }
