@@ -14,8 +14,8 @@ Intervention = dict[str, Any]
 
 CITATIONS: dict[str, Citation] = {
     "life_physical_activity": {
-        "short": "Pahor et al., JAMA 2014",
-        "display": "Pahor et al., Effect of Structured Physical Activity",
+        "short": "Effect of Structured Physical Activity — Pahor et al.",
+        "display": "Effect of Structured Physical Activity — Pahor et al.",
         "full": (
             "Pahor M, Guralnik JM, Ambrosius WT, et al. Effect of structured physical "
             "activity on prevention of major mobility disability in older adults: the LIFE "
@@ -26,8 +26,8 @@ CITATIONS: dict[str, Citation] = {
         "peer_reviewed": True,
     },
     "falls_exercise": {
-        "short": "Sherrington et al., Br J Sports Med 2017",
-        "display": "Sherrington et al., Exercise to Prevent Falls",
+        "short": "Exercise to Prevent Falls in Older Adults — Sherrington et al.",
+        "display": "Exercise to Prevent Falls in Older Adults — Sherrington et al.",
         "full": (
             "Sherrington C, Michaleff ZA, Fairhall N, et al. Exercise to prevent falls "
             "in older adults: an updated systematic review and meta-analysis. British "
@@ -38,8 +38,8 @@ CITATIONS: dict[str, Citation] = {
         "peer_reviewed": True,
     },
     "protein_older_adults": {
-        "short": "Bauer et al., J Am Med Dir Assoc 2013",
-        "display": "Bauer et al., Optimal Dietary Protein Intake in Older People",
+        "short": "Optimal Dietary Protein Intake in Older People — Bauer et al.",
+        "display": "Optimal Dietary Protein Intake in Older People — Bauer et al.",
         "full": (
             "Bauer J, Biolo G, Cederholm T, et al. Evidence-based recommendations for "
             "optimal dietary protein intake in older people: a position paper from the "
@@ -51,8 +51,8 @@ CITATIONS: dict[str, Citation] = {
         "peer_reviewed": True,
     },
     "aerobic_cognition": {
-        "short": "Smith et al., Psychosom Med 2010",
-        "display": "Smith et al., Aerobic Exercise and Neurocognitive Performance",
+        "short": "Aerobic Exercise and Neurocognitive Performance — Smith et al.",
+        "display": "Aerobic Exercise and Neurocognitive Performance — Smith et al.",
         "full": (
             "Smith PJ, Blumenthal JA, Hoffman BM, et al. Aerobic exercise and "
             "neurocognitive performance: a meta-analytic review of randomized controlled "
@@ -63,8 +63,8 @@ CITATIONS: dict[str, Citation] = {
         "peer_reviewed": True,
     },
     "mediterranean_cognition": {
-        "short": "Martinez-Lapiscina et al., JNNP 2013",
-        "display": "Martinez-Lapiscina et al., Mediterranean Diet Improves Cognition",
+        "short": "Mediterranean Diet Improves Cognition — Martinez-Lapiscina et al.",
+        "display": "Mediterranean Diet Improves Cognition — Martinez-Lapiscina et al.",
         "full": (
             "Martinez-Lapiscina EH, Clavero P, Toledo E, et al. Mediterranean diet "
             "improves cognition: the PREDIMED-NAVARRA randomised trial. Journal of "
