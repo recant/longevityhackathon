@@ -2,6 +2,7 @@
   const OLD_BRAND_PASCAL = ['K', 'in', 'Span'].join('');
   const OLD_BRAND_LOWER = ['k', 'in', 'span'].join('');
   const OLD_BRAND_UPPER = ['K', 'IN', 'SPAN'].join('');
+  const BOOT_RESET_KEY = 'longevitree_boot_reset_done';
 
   function replaceBrandText(value) {
     return String(value || '')
@@ -23,6 +24,44 @@
       .join("We'll start with the Quick Stand test. Grab a chair — it takes under a minute");
   }
 
+  function clearOldBrowserMemory() {
+    try {
+      const localKeys = [];
+      for (let i = 0; i < localStorage.length; i += 1) {
+        const key = localStorage.key(i);
+        if (key && (/kinspan/i.test(key) || /longevitree/i.test(key))) localKeys.push(key);
+      }
+      localKeys.forEach((key) => localStorage.removeItem(key));
+    } catch (_) {}
+
+    try {
+      const sessionKeys = [];
+      for (let i = 0; i < sessionStorage.length; i += 1) {
+        const key = sessionStorage.key(i);
+        if (key && (/kinspan/i.test(key) || /longevitree/i.test(key))) sessionKeys.push(key);
+      }
+      sessionKeys.forEach((key) => {
+        if (key !== BOOT_RESET_KEY) sessionStorage.removeItem(key);
+      });
+    } catch (_) {}
+  }
+
+  async function resetServerMemoryForFreshTab() {
+    try {
+      if (sessionStorage.getItem(BOOT_RESET_KEY) === '1') return;
+      sessionStorage.setItem(BOOT_RESET_KEY, '1');
+      clearOldBrowserMemory();
+      await fetch('/api/reset', { method: 'POST', cache: 'no-store' }).catch(() => null);
+      await fetch('/api/profile', {
+        method: 'PUT',
+        cache: 'no-store',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ display_name: 'Mom/Dad', age: 68, sex: 'female' }),
+      }).catch(() => null);
+      location.replace(location.pathname + location.search + location.hash);
+    } catch (_) {}
+  }
+
   function installQuickStandGridStyles() {
     if (document.getElementById('longevitreeGridPatchStyles')) return;
     const style = document.createElement('style');
@@ -37,29 +76,17 @@
     document.head.appendChild(style);
   }
 
-  function forceFullCheckinOnBoot() {
-    if (window.__longevitreeForcedFullCheckin) return;
-    window.__longevitreeForcedFullCheckin = true;
-    const open = () => {
-      try {
-        if (typeof window.goTo === 'function') {
-          window.goTo('guided');
-          const frame = document.getElementById('guidedFrame');
-          if (frame && !String(frame.getAttribute('src') || '').includes('/classic')) {
-            frame.src = '/classic?embed=1';
-          }
-        }
-      } catch (_) {}
-    };
-    setTimeout(open, 150);
-    setTimeout(open, 600);
-    setTimeout(open, 1200);
+  function showIntroScreen() {
+    try {
+      if (typeof window.goSlide === 'function') window.goSlide(0);
+      if (typeof window.goTo === 'function') window.goTo('onboarding');
+    } catch (_) {}
   }
 
   function applyBranding() {
     try {
       installQuickStandGridStyles();
-      document.title = replaceBrandText(document.title);
+      document.title = replaceBrandText(document.title).replace('Longevity App v2', 'Longevitree');
       const root = document.body || document.documentElement;
       if (!root) return;
       const walker = document.createTreeWalker(root, NodeFilter.SHOW_TEXT);
@@ -150,11 +177,12 @@
   }
 
   window.longevitreeApplyBranding = applyBranding;
+  resetServerMemoryForFreshTab();
   document.addEventListener('DOMContentLoaded', () => {
     installQuickStandGridStyles();
     patchNavigation();
     applyBranding();
-    forceFullCheckinOnBoot();
+    setTimeout(showIntroScreen, 150);
   });
   window.addEventListener('focus', () => {
     installQuickStandGridStyles();
@@ -174,5 +202,4 @@
   installQuickStandGridStyles();
   patchNavigation();
   applyBranding();
-  forceFullCheckinOnBoot();
 })();
