@@ -349,7 +349,7 @@ def _save_upload(video: UploadFile) -> Path:
     ext = Path(video.filename or "clip.webm").suffix or ".webm"
     dest = DATA_DIR / "videos" / f"{uuid.uuid4().hex}{ext}"
     with dest.open("wb") as f:
-        shutil.copyfileobj(video.file)
+        shutil.copyfileobj(video.file, f)
     return dest
 
 
