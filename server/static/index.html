@@ -120,6 +120,22 @@
       margin: 0.5rem 0 0; padding: 0 0.25rem;
     }
     body.embed .embed-exit-hint.show { display: block; }
+    body.embed .path-picker-heading {
+      font-size: 0.95rem;
+      margin: 0.5rem 0 0.35rem;
+    }
+    body.embed .path-cards {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 0.45rem;
+      margin: 0 0 0.5rem;
+    }
+    body.embed .path-card {
+      padding: 0.65rem 0.55rem;
+    }
+    body.embed .path-card strong { font-size: 0.88rem; }
+    body.embed .path-card span { font-size: 0.72rem; line-height: 1.3; }
+    body.embed #cvBackend { font-size: 0.75rem; margin: 0 0 0.35rem; }
   </style>
 </head>
 <body>
@@ -132,8 +148,8 @@
     </p>
     <div class="notice embed-hide">Wellness trends only — not medical diagnosis. Run <code>server/start.ps1</code> (port 8003).</div>
 
-    <h2 class="embed-hide" style="font-size:1rem;margin:0.75rem 0 0.35rem">Choose assessment path</h2>
-    <div class="path-cards embed-hide">
+    <h2 class="path-picker-heading" style="font-size:1rem;margin:0.75rem 0 0.35rem">Choose assessment path</h2>
+    <div class="path-cards">
       <button type="button" class="path-card selected" id="pickManual">
         <strong>At-home tests</strong>
         <span>Timer, tap reaction, chair counter — no video.</span>

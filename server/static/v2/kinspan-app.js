@@ -385,6 +385,8 @@ function renderJournals() {
       if (e.target.closest(".journal-edit")) return;
       const id = card.getAttribute("data-profile-id");
       setActiveProfileId(id);
+      treatmentTracker = null;
+      treatmentTrackerUnavailable = false;
       await loadProfile();
       try {
         await loadSnapshot();
@@ -1242,8 +1244,9 @@ function renderDigest() {
     insights.innerHTML = cards.length ? cards.join("") : "<p class='digest-empty'>More insights after your next check-in.</p>";
   }
 
-  if (action && snapshot?.actions?.[0]) {
-    action.textContent = snapshot.actions[0].detail;
+  if (action) {
+    action.textContent = snapshot?.actions?.[0]?.detail
+      || "Complete a check-in to get a personalized suggestion.";
   }
 }
 
