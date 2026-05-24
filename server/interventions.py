@@ -9,67 +9,9 @@ from __future__ import annotations
 
 from typing import Any
 
-Citation = dict[str, str | bool]
-Intervention = dict[str, Any]
+from citations import CITATIONS, Citation, get_citation
 
-CITATIONS: dict[str, Citation] = {
-    "life_physical_activity": {
-        "short": "Pahor et al., JAMA 2014",
-        "full": (
-            "Pahor M, Guralnik JM, Ambrosius WT, et al. Effect of structured physical "
-            "activity on prevention of major mobility disability in older adults: the LIFE "
-            "study randomized clinical trial. JAMA. 2014;311(23):2387-2396."
-        ),
-        "doi": "10.1001/jama.2014.5616",
-        "url": "https://doi.org/10.1001/jama.2014.5616",
-        "peer_reviewed": True,
-    },
-    "falls_exercise": {
-        "short": "Sherrington et al., Br J Sports Med 2017",
-        "full": (
-            "Sherrington C, Michaleff ZA, Fairhall N, et al. Exercise to prevent falls "
-            "in older adults: an updated systematic review and meta-analysis. British "
-            "Journal of Sports Medicine. 2017;51(24):1750-1758."
-        ),
-        "doi": "10.1136/bjsports-2016-096547",
-        "url": "https://doi.org/10.1136/bjsports-2016-096547",
-        "peer_reviewed": True,
-    },
-    "protein_older_adults": {
-        "short": "Bauer et al., J Am Med Dir Assoc 2013",
-        "full": (
-            "Bauer J, Biolo G, Cederholm T, et al. Evidence-based recommendations for "
-            "optimal dietary protein intake in older people: a position paper from the "
-            "PROT-AGE Study Group. Journal of the American Medical Directors Association. "
-            "2013;14(8):542-559."
-        ),
-        "doi": "10.1016/j.jamda.2013.05.021",
-        "url": "https://doi.org/10.1016/j.jamda.2013.05.021",
-        "peer_reviewed": True,
-    },
-    "aerobic_cognition": {
-        "short": "Smith et al., Psychosom Med 2010",
-        "full": (
-            "Smith PJ, Blumenthal JA, Hoffman BM, et al. Aerobic exercise and "
-            "neurocognitive performance: a meta-analytic review of randomized controlled "
-            "trials. Psychosomatic Medicine. 2010;72(3):239-252."
-        ),
-        "doi": "10.1097/PSY.0b013e3181d14633",
-        "url": "https://doi.org/10.1097/PSY.0b013e3181d14633",
-        "peer_reviewed": True,
-    },
-    "mediterranean_cognition": {
-        "short": "Martinez-Lapiscina et al., JNNP 2013",
-        "full": (
-            "Martinez-Lapiscina EH, Clavero P, Toledo E, et al. Mediterranean diet "
-            "improves cognition: the PREDIMED-NAVARRA randomised trial. Journal of "
-            "Neurology, Neurosurgery & Psychiatry. 2013;84(12):1318-1325."
-        ),
-        "doi": "10.1136/jnnp-2012-304792",
-        "url": "https://doi.org/10.1136/jnnp-2012-304792",
-        "peer_reviewed": True,
-    },
-}
+Intervention = dict[str, Any]
 
 
 def _find_category(categories: list[dict[str, Any]], category: str) -> dict[str, Any] | None:
@@ -121,7 +63,7 @@ def _make(
         "title": title,
         "suggestion": suggestion,
         "rationale": rationale,
-        "citation": CITATIONS[citation_key],
+        "citation": get_citation(citation_key),
     }
 
 

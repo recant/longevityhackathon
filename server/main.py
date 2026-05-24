@@ -28,8 +28,10 @@ from pydantic import BaseModel, Field
 from cv_analysis import ActionMismatchError, analyze_chair_video, analyze_walk_video, reset_pose_detectors
 from database import (
     DATA_DIR,
+    clear_all_app_data,
     clear_assessment_data,
     create_profile,
+    delete_profile,
     get_default_profile,
     get_profile_by_id,
     get_treatment_state,
@@ -67,7 +69,7 @@ STATIC_DIR = Path(__file__).parent / "static"
 UI_DIR = STATIC_DIR / "ui"
 V2_DIR = STATIC_DIR / "v2"
 LEGACY_UI = STATIC_DIR / "index.html"
-BUILD_ID = "2026-05-24-v2-integrated"
+BUILD_ID = "2026-05-24-reset-fix-2"
 
 app = FastAPI(title="KinSpan API", version="0.2.0", description="Longevity translator for families")
 
@@ -191,21 +193,21 @@ def _build_snapshot(profile: dict[str, Any], history: dict[str, Any]) -> dict[st
         latest = reactions[0]
         prev = reactions[1]["scores"]["score"] if len(reactions) > 1 else None
         cat = {**latest["scores"], "latest_at": latest["created_at"]}
-        cat["trend_detail"] = compute_trend(cat["score"], prev)
+        cat["trend_detail"] = compute_trend(cat["score"], prev, category=cat.get("category"))
         categories.append(cat)
 
     if gaits:
         latest = gaits[0]
         prev = gaits[1]["scores"]["score"] if len(gaits) > 1 else None
         cat = {**latest["scores"], "latest_at": latest["created_at"]}
-        cat["trend_detail"] = compute_trend(cat["score"], prev)
+        cat["trend_detail"] = compute_trend(cat["score"], prev, category=cat.get("category"))
         categories.append(cat)
 
     if chairs:
         latest = chairs[0]
         prev = chairs[1]["scores"]["score"] if len(chairs) > 1 else None
         cat = {**latest["scores"], "latest_at": latest["created_at"]}
-        cat["trend_detail"] = compute_trend(cat["score"], prev)
+        cat["trend_detail"] = compute_trend(cat["score"], prev, category=cat.get("category"))
         categories.append(cat)
 
     overall = overall_snapshot(categories, age)
@@ -259,6 +261,16 @@ async def format_api_error_js() -> FileResponse:
     )
 
 
+@app.get("/citations-ui.js")
+async def citations_ui_js() -> FileResponse:
+    """Citation link renderer for results and advice."""
+    return FileResponse(
+        STATIC_DIR / "citations-ui.js",
+        media_type="application/javascript",
+        headers={"Cache-Control": "no-store, no-cache, must-revalidate"},
+    )
+
+
 @app.get("/v2")
 async def v2_ui_redirect() -> RedirectResponse:
     """Longevity App v2 (same UI as /)."""
@@ -273,8 +285,10 @@ if V2_DIR.is_dir():
 
 
 @app.post("/api/reset")
-async def reset_data() -> dict[str, Any]:
-    """Clear assessment sessions, uploaded videos, and in-memory CV pose detectors."""
+async def reset_data(full: bool = Query(False)) -> dict[str, Any]:
+    """Clear sessions/videos; pass ?full=1 to also delete all profiles and treatment data."""
+    if full:
+        return await _wipe_all_app_data()
     reset_pose_detectors()
     counts = await clear_assessment_data()
     return {
@@ -284,6 +298,32 @@ async def reset_data() -> dict[str, Any]:
         "localStorage.removeItem('kinspan_path'); localStorage.removeItem('kinspan_completed'); "
         "localStorage.removeItem('kinspan_workflow_step');",
     }
+
+
+async def _wipe_all_app_data() -> dict[str, Any]:
+    """Delete all profiles, assessments, treatment data, and uploaded videos."""
+    reset_pose_detectors()
+    counts = await clear_all_app_data()
+    return {"ok": True, "cleared": counts}
+
+
+@app.post("/api/reset-all")
+async def reset_app() -> dict[str, Any]:
+    """Full factory reset (profiles + scores + videos)."""
+    return await _wipe_all_app_data()
+
+
+@app.delete("/api/profiles")
+async def delete_all_profiles() -> dict[str, Any]:
+    """Delete every profile and all related assessment data."""
+    return await _wipe_all_app_data()
+
+
+@app.delete("/api/profile")
+async def delete_one_profile(profile_id: int = Query(...)) -> dict[str, Any]:
+    """Delete a single parent profile and its assessment history."""
+    await delete_profile(profile_id)
+    return {"ok": True, "profile_id": profile_id}
 
 
 @app.get("/api/health")

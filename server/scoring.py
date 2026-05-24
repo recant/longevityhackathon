@@ -10,6 +10,8 @@ from __future__ import annotations
 
 from typing import Any, Literal
 
+from citations import attach_citations
+
 Trend = Literal["improving", "stable", "watch_closely"]
 
 FEET_10_METERS = 3.048  # 10-foot walk → m/s (common short timed walk)
@@ -130,18 +132,21 @@ def score_reaction(median_ms: float, age: int) -> dict[str, Any]:
             "(walks, games, dual-task play) can support function (Rosado-Antón et al., 2021)."
         )
 
-    return {
-        "category": "cognitive_speed",
-        "label": "Cognitive Speed",
-        "score": round(score, 1),
-        "band": band,
-        "interpretation": line,
-        "functional_age": functional_age,
-        "assessment_mode": "manual",
-        "raw": {"median_ms": median_ms, "expected_ms": round(expected)},
-        "evidence": ["Woods et al., Front Psychol 2015", "Rosado-Antón et al., BMC Public Health 2021"],
-        "emoji": "brain",
-    }
+    return attach_citations(
+        {
+            "category": "cognitive_speed",
+            "label": "Cognitive Speed",
+            "score": round(score, 1),
+            "band": band,
+            "interpretation": line,
+            "functional_age": functional_age,
+            "assessment_mode": "manual",
+            "raw": {"median_ms": median_ms, "expected_ms": round(expected)},
+            "evidence": ["Woods et al., Front Psychol 2015", "Rosado-Antón et al., BMC Public Health 2021"],
+            "emoji": "brain",
+        },
+        ["woods_reaction_2015", "rosado_reaction_2021"],
+    )
 
 
 def gait_speed_mps(time_seconds: float) -> float:
@@ -281,28 +286,31 @@ def score_chair_single_stand(
             "gentle sit-to-stand practice can help (CDC STEADI)."
         )
 
-    return {
-        "category": "strength_stability",
-        "label": "Strength & Stability",
-        "score": round(score, 1),
-        "band": band,
-        "interpretation": line,
-        "functional_age": functional_age,
-        "assessment_mode": "manual",
-        "raw": {
-            "rise_time_seconds": round(rise_time_seconds, 2),
-            "smoothness_index": round(smoothness_index, 3),
-            "reps_30s_equivalent": round(reps_eq, 1),
-            "expected_reps_30s": round(expected_reps, 1),
-            "expected_rise_seconds": round(expected_rise, 2),
+    return attach_citations(
+        {
+            "category": "strength_stability",
+            "label": "Strength & Stability",
+            "score": round(score, 1),
+            "band": band,
+            "interpretation": line,
+            "functional_age": functional_age,
+            "assessment_mode": "manual",
+            "raw": {
+                "rise_time_seconds": round(rise_time_seconds, 2),
+                "smoothness_index": round(smoothness_index, 3),
+                "reps_30s_equivalent": round(reps_eq, 1),
+                "expected_reps_30s": round(expected_reps, 1),
+                "expected_rise_seconds": round(expected_rise, 2),
+            },
+            "evidence": [
+                "CDC STEADI 30-second Chair Stand",
+                "Rikli & Jones, Senior Fitness Test",
+                "LIFE Study, JAMA 2014",
+            ],
+            "emoji": "chair",
         },
-        "evidence": [
-            "CDC STEADI 30-second Chair Stand",
-            "Rikli & Jones, Senior Fitness Test",
-            "LIFE Study, JAMA 2014",
-        ],
-        "emoji": "chair",
-    }
+        ["cdc_steadi_chair", "rikli_chair_sft", "life_physical_activity"],
+    )
 
 
 def score_chair_from_cv(cv: dict[str, Any], age: int, sex: str | None = None) -> dict[str, Any]:
@@ -336,30 +344,39 @@ def score_gait(time_seconds: float, age: int, sex: str | None = None) -> dict[st
     else:
         band = "watch"
 
-    return {
-        "category": "mobility",
-        "label": "Mobility",
-        "score": round(score, 1),
-        "band": band,
-        "interpretation": pace_note,
-        "functional_age": functional_age,
-        "assessment_mode": "manual",
-        "raw": {
-            "time_seconds": round(time_seconds, 2),
-            "speed_mps": round(speed, 3),
-            "expected_mps": round(expected, 3),
-            "bohannon_score": round(bohannon_score, 1),
-            "studenski_score": round(studenski_score, 1),
-            "studenski_band": (
-                "≥1.0" if speed >= 1.0 else "0.8-0.99" if speed >= 0.8 else "0.6-0.79" if speed >= 0.6 else "<0.6"
-            ),
+    return attach_citations(
+        {
+            "category": "mobility",
+            "label": "Mobility",
+            "score": round(score, 1),
+            "band": band,
+            "interpretation": pace_note,
+            "functional_age": functional_age,
+            "assessment_mode": "manual",
+            "raw": {
+                "time_seconds": round(time_seconds, 2),
+                "speed_mps": round(speed, 3),
+                "expected_mps": round(expected, 3),
+                "bohannon_score": round(bohannon_score, 1),
+                "studenski_score": round(studenski_score, 1),
+                "studenski_band": (
+                    "≥1.0"
+                    if speed >= 1.0
+                    else "0.8-0.99"
+                    if speed >= 0.8
+                    else "0.6-0.79"
+                    if speed >= 0.6
+                    else "<0.6"
+                ),
+            },
+            "evidence": [
+                "Bohannon & Andrews, Physiotherapy 2011",
+                "Studenski et al., JAMA 2011",
+            ],
+            "emoji": "walking",
         },
-        "evidence": [
-            "Bohannon & Andrews, Physiotherapy 2011",
-            "Studenski et al., JAMA 2011",
-        ],
-        "emoji": "walking",
-    }
+        ["bohannon_gait_2011", "studenski_gait_2011"],
+    )
 
 
 def expected_chair_reps(age: int, sex: str | None) -> float:
@@ -392,22 +409,25 @@ def score_chair_stand(reps: int, age: int, sex: str | None = None) -> dict[str, 
             "walking program may help mobility and independence."
         )
 
-    return {
-        "category": "strength_stability",
-        "label": "Strength & Stability",
-        "score": round(score, 1),
-        "band": band,
-        "interpretation": line,
-        "functional_age": functional_age,
-        "assessment_mode": "manual",
-        "raw": {"reps_30s": reps, "expected_reps": round(expected, 1)},
-        "evidence": [
-            "CDC STEADI 30-second Chair Stand",
-            "Rikli & Jones, Senior Fitness Test",
-            "LIFE Study, JAMA 2014",
-        ],
-        "emoji": "chair",
-    }
+    return attach_citations(
+        {
+            "category": "strength_stability",
+            "label": "Strength & Stability",
+            "score": round(score, 1),
+            "band": band,
+            "interpretation": line,
+            "functional_age": functional_age,
+            "assessment_mode": "manual",
+            "raw": {"reps_30s": reps, "expected_reps": round(expected, 1)},
+            "evidence": [
+                "CDC STEADI 30-second Chair Stand",
+                "Rikli & Jones, Senior Fitness Test",
+                "LIFE Study, JAMA 2014",
+            ],
+            "emoji": "chair",
+        },
+        ["cdc_steadi_chair", "rikli_chair_sft", "life_physical_activity"],
+    )
 
 
 def compute_trend(
@@ -415,13 +435,25 @@ def compute_trend(
     previous: float | None,
     *,
     higher_is_better: bool = True,
+    category: str | None = None,
 ) -> dict[str, Any]:
+    trend_keys = ["longitudinal_tracking"]
+    if category:
+        trend_keys = list(dict.fromkeys(trend_keys + list(
+            {"mobility": ["studenski_gait_2011"],
+             "strength_stability": ["rikli_chair_sft"],
+             "cognitive_speed": ["woods_reaction_2015"]}.get(category, [])
+        )))
+
     if previous is None:
-        return {
-            "trend": "stable",
-            "change_pct": None,
-            "summary": "First check-in — come back monthly to see your trajectory.",
-        }
+        return attach_citations(
+            {
+                "trend": "stable",
+                "change_pct": None,
+                "summary": "First check-in — come back monthly to see your trajectory.",
+            },
+            trend_keys,
+        )
 
     if previous == 0:
         change_pct = 0.0
@@ -441,100 +473,128 @@ def compute_trend(
         trend = "stable"
         summary = "Holding steady since last check-in."
 
-    return {"trend": trend, "change_pct": change_pct, "summary": summary}
+    return attach_citations(
+        {"trend": trend, "change_pct": change_pct, "summary": summary},
+        trend_keys,
+    )
 
 
 def overall_snapshot(categories: list[dict[str, Any]], chronological_age: int) -> dict[str, Any]:
     scores = [c["score"] for c in categories if c.get("score") is not None]
     if not scores:
-        return {
-            "overall_score": None,
-            "overall_functional_age": None,
-            "headline": "Complete your first check-ins to see a snapshot.",
-            "trend": "stable",
-        }
+        return attach_citations(
+            {
+                "overall_score": None,
+                "overall_functional_age": None,
+                "headline": "Complete your first check-ins to see a snapshot.",
+                "trend": "stable",
+            },
+            ["longitudinal_tracking"],
+        )
 
     overall = round(sum(scores) / len(scores), 1)
     func_ages = [c.get("functional_age") for c in categories if c.get("functional_age")]
     overall_func = round(sum(func_ages) / len(func_ages)) if func_ages else chronological_age
 
+    overall_keys = ["longitudinal_tracking"]
     if overall >= 75:
         headline = "Functional health looks steady this month — keep up the gentle habits."
         trend = "stable"
+        overall_keys.append("life_physical_activity")
     elif overall >= 55:
         headline = "Most signals are typical — tracking monthly helps catch small shifts early."
         trend = "stable"
+        overall_keys.append("studenski_gait_2011")
     else:
         headline = (
             "Some patterns suggest stamina or strength could use support — "
-            "evidence-based walking and strength habits often help (LIFE Study, 2014)."
+            "evidence-based walking and strength habits often help."
         )
         trend = "watch_closely"
+        overall_keys.extend(["life_physical_activity", "falls_exercise"])
 
-    return {
-        "overall_score": overall,
-        "overall_functional_age": overall_func,
-        "chronological_age": chronological_age,
-        "headline": headline,
-        "trend": trend,
-    }
+    return attach_citations(
+        {
+            "overall_score": overall,
+            "overall_functional_age": overall_func,
+            "chronological_age": chronological_age,
+            "headline": headline,
+            "trend": trend,
+        },
+        overall_keys,
+    )
 
 
-def default_actions(categories: list[dict[str, Any]]) -> list[dict[str, str]]:
+def default_actions(categories: list[dict[str, Any]]) -> list[dict[str, Any]]:
     """Recommendations aligned with LIFE Study (structured physical activity)."""
-    actions: list[dict[str, str]] = []
+    actions: list[dict[str, Any]] = []
     by_cat = {c["category"]: c for c in categories}
 
     cog = by_cat.get("cognitive_speed")
     if cog and cog.get("score", 100) < 70:
         actions.append(
-            {
-                "title": "Brain-and-body activities",
-                "detail": (
-                    "10–15 minutes daily of conversation, light puzzles, or walking while counting "
-                    "supports cognitive-motor speed (Rosado-Antón et al., 2021)."
-                ),
-            }
+            attach_citations(
+                {
+                    "title": "Brain-and-body activities",
+                    "detail": (
+                        "10–15 minutes daily of conversation, light puzzles, or walking while counting "
+                        "supports cognitive-motor speed."
+                    ),
+                },
+                ["rosado_reaction_2021", "aerobic_cognition"],
+            )
         )
 
     mob = by_cat.get("mobility")
     if mob and mob.get("score", 100) < 70:
         actions.append(
-            {
-                "title": "Structured walking (LIFE-style)",
-                "detail": (
-                    "Build toward 20–30 minutes of walking most days at a comfortable pace — "
-                    "the LIFE trial showed structured activity reduced major mobility disability "
-                    "(Pahor et al., JAMA 2014). Walk together so it feels social."
-                ),
-            }
+            attach_citations(
+                {
+                    "title": "Structured walking (LIFE-style)",
+                    "detail": (
+                        "Build toward 20–30 minutes of walking most days at a comfortable pace — "
+                        "structured activity reduced major mobility disability in the LIFE trial. "
+                        "Walk together so it feels social."
+                    ),
+                },
+                ["life_physical_activity"],
+            )
         )
 
     strength = by_cat.get("strength_stability")
     if strength and strength.get("score", 100) < 70:
         actions.append(
-            {
-                "title": "CDC STEADI chair-stand practice",
-                "detail": (
-                    "5 slow sit-to-stands, twice daily, arms crossed on chest when safe. "
-                    "Matches fall-prevention screening habits (CDC STEADI)."
-                ),
-            }
+            attach_citations(
+                {
+                    "title": "CDC STEADI chair-stand practice",
+                    "detail": (
+                        "5 slow sit-to-stands, twice daily, arms crossed on chest when safe. "
+                        "Matches fall-prevention screening habits."
+                    ),
+                },
+                ["cdc_steadi_chair", "falls_exercise"],
+            )
         )
 
     if not actions:
         actions.append(
-            {
-                "title": "Keep the monthly rhythm",
-                "detail": "Re-run these three check-ins monthly. Trends matter more than any single score.",
-            }
+            attach_citations(
+                {
+                    "title": "Keep the monthly rhythm",
+                    "detail": "Re-run these three check-ins monthly. Trends matter more than any single score.",
+                },
+                ["longitudinal_tracking"],
+            )
         )
 
     actions.append(
-        {
-            "title": "Protein & hydration",
-            "detail": "Palm-sized protein each meal and water with meals support muscle maintenance as we age.",
-        }
+        attach_citations(
+            {
+                "title": "Protein & hydration",
+                "detail": "Palm-sized protein each meal and water with meals support muscle maintenance as we age.",
+            },
+            ["protein_older_adults"],
+        )
     )
     return actions
 

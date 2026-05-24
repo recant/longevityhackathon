@@ -155,6 +155,16 @@ async def get_default_profile() -> dict[str, Any]:
     return profiles[0]
 
 
+async def delete_profile(profile_id: int) -> None:
+    """Remove one profile and all sessions / tracker state for that profile."""
+    async with aiosqlite.connect(DB_PATH) as db:
+        for table in ("reaction_sessions", "gait_sessions", "chair_sessions"):
+            await db.execute(f"DELETE FROM {table} WHERE profile_id = ?", (profile_id,))
+        await db.execute("DELETE FROM treatment_tracker WHERE profile_id = ?", (profile_id,))
+        await db.execute("DELETE FROM profiles WHERE id = ?", (profile_id,))
+        await db.commit()
+
+
 async def update_profile(profile_id: int, data: dict[str, Any]) -> dict[str, Any]:
     allowed = ("display_name", "age", "sex", "lifestyle", "medications", "smoking", "sleep_habits")
     sets = []
@@ -362,8 +372,6 @@ async def save_treatment_toggle(
 
 async def clear_assessment_data() -> dict[str, int]:
     """Delete all biomarker sessions and uploaded videos (keeps profile)."""
-    import shutil
-
     counts = {"reactions": 0, "gaits": 0, "chairs": 0, "videos_removed": 0}
     async with aiosqlite.connect(DB_PATH) as db:
         for table, key in (
@@ -375,10 +383,28 @@ async def clear_assessment_data() -> dict[str, int]:
             counts[key] = cur.rowcount
         await db.commit()
 
+    counts["videos_removed"] = _clear_uploaded_videos()
+    return counts
+
+
+def _clear_uploaded_videos() -> int:
+    removed = 0
     videos_dir = DATA_DIR / "videos"
     if videos_dir.is_dir():
         for f in videos_dir.iterdir():
             if f.is_file():
                 f.unlink(missing_ok=True)
-                counts["videos_removed"] += 1
+                removed += 1
+    return removed
+
+
+async def clear_all_app_data() -> dict[str, int]:
+    """Delete profiles, assessments, treatment plans, and uploaded videos."""
+    counts = await clear_assessment_data()
+    async with aiosqlite.connect(DB_PATH) as db:
+        cur = await db.execute("DELETE FROM treatment_tracker")
+        counts["treatment_plans"] = cur.rowcount
+        cur = await db.execute("DELETE FROM profiles")
+        counts["profiles"] = cur.rowcount
+        await db.commit()
     return counts

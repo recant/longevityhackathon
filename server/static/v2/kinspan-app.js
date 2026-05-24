@@ -2,6 +2,10 @@
  * KinSpan v2 — full app wired to API (v1 features, v2 design).
  */
 const SKIP_ONBOARDING_KEY = "kinspan_v2_skip_onboarding";
+const PATH_KEY = "kinspan_path";
+const PREFERRED_PATH_KEY = "kinspan_preferred_path";
+const WORKFLOW_STEP_KEY = "kinspan_workflow_step";
+const WORKFLOW_COMPLETED_KEY = "kinspan_completed";
 const CAREGIVER_NAME_KEY = "kinspan_caregiver_name";
 const ACTIVE_PROFILE_KEY = "kinspan_active_profile_id";
 
@@ -40,10 +44,12 @@ function withProfile(path) {
     path.startsWith("/api/profiles") ||
     path.startsWith("/api/version") ||
     path.startsWith("/api/paths") ||
-    path.startsWith("/api/reset")
+    path.startsWith("/api/reset") ||
+    path === "/api/reset-all"
   ) {
     return path;
   }
+  if (path.includes("profile_id=")) return path;
   const sep = path.includes("?") ? "&" : "?";
   return `${path}${sep}profile_id=${encodeURIComponent(id)}`;
 }
@@ -193,16 +199,346 @@ async function afterAssessmentSaved() {
   if (currentScreen === "doctor-export") renderDoctorExport();
   if (currentScreen === "graphs") renderGraphs(true);
   if (currentScreen === "treatment") renderTreatmentTracker();
+  if (currentScreen === "tests") {
+    renderTestsHub();
+    renderCheckinResultsBanner();
+  }
+}
+
+function renderCheckinResultsBanner() {
+  const el = document.getElementById("testsCheckinResults");
+  if (!el) return;
+  if (!snapshot?.categories?.length) {
+    el.hidden = true;
+    el.innerHTML = "";
+    return;
+  }
+  const parts = ['<h3>Latest check-in results</h3>'];
+  if (snapshot.overall?.overall_score != null) {
+    parts.push(
+      `<p class="checkin-overall"><strong>${Math.round(snapshot.overall.overall_score)}/100</strong> — ${escapeHtml(snapshot.overall.headline || "")}</p>` +
+        citesHtml(snapshot.overall.citations, { className: "cite-list", prefix: "Sources: " })
+    );
+  }
+  (snapshot.categories || []).forEach((c) => {
+    parts.push(
+      `<div class="checkin-cat"><strong>${escapeHtml(c.label)}</strong> ${c.score}/100<br>${escapeHtml(c.interpretation || "")}` +
+        (c.trend_detail?.summary
+          ? `<em>${escapeHtml(c.trend_detail.summary)}</em>`
+          : "") +
+        citesHtml(c.citations || c.trend_detail?.citations, {
+          className: "cite-list",
+          prefix: "Sources: ",
+        }) +
+        `</div>`
+    );
+  });
+  if (snapshot.insights?.what_changed) {
+    parts.push(
+      `<p class="checkin-advice"><strong>What changed</strong>${escapeHtml(snapshot.insights.what_changed)}</p>` +
+        citesHtml(snapshot.insights.what_changed_citations, {
+          className: "cite-list",
+          prefix: "Sources: ",
+        })
+    );
+  }
+  if (snapshot.insights?.summary) {
+    parts.push(
+      `<p class="checkin-advice"><strong>Family summary</strong>${escapeHtml(snapshot.insights.summary)}</p>` +
+        citesHtml(snapshot.insights.summary_citations || snapshot.insights.citations, {
+          className: "cite-list",
+          prefix: "Sources: ",
+        })
+    );
+  }
+  if (snapshot.insights?.conversation_tip) {
+    parts.push(
+      `<p class="checkin-advice"><strong>Conversation tip</strong>${escapeHtml(snapshot.insights.conversation_tip)}</p>` +
+        citesHtml(snapshot.insights.conversation_tip_citations, {
+          className: "cite-list",
+          prefix: "Sources: ",
+        })
+    );
+  }
+  (snapshot.actions || []).forEach((a) => {
+    parts.push(
+      `<p class="checkin-advice"><strong>${escapeHtml(a.title)}</strong>${escapeHtml(a.detail)}</p>` +
+        citesHtml(a.citations, { className: "cite-list", prefix: "Sources: " })
+    );
+  });
+  (snapshot.interventions || []).slice(0, 3).forEach((inv) => {
+    const cites = inv.citation ? [inv.citation] : inv.citations || [];
+    parts.push(
+      `<p class="checkin-advice"><strong>${escapeHtml(inv.title)}</strong>${escapeHtml(inv.suggestion || "")}</p>` +
+        citesHtml(cites, { className: "cite-list", prefix: "Sources: " })
+    );
+  });
+  el.innerHTML = parts.join("");
+  el.hidden = false;
+}
+
+function renderTrackerAdvice() {
+  const el = document.getElementById("trackerAdvice");
+  if (!el) return;
+  const action = snapshot?.actions?.[0];
+  const inv = snapshot?.interventions?.[0];
+  if (!action && !inv) {
+    el.hidden = true;
+    el.innerHTML = "";
+    return;
+  }
+  let html = "";
+  if (action) {
+    html +=
+      `<p><strong>Suggested next step:</strong> ${escapeHtml(action.detail)}</p>` +
+      citesHtml(action.citations, { className: "cite-list", prefix: "Sources: " });
+  }
+  if (inv) {
+    html +=
+      `<p><strong>${escapeHtml(inv.title)}:</strong> ${escapeHtml(inv.suggestion || "")}</p>` +
+      citesHtml(inv.citation ? [inv.citation] : inv.citations || [], {
+        className: "cite-list",
+        prefix: "Sources: ",
+      });
+  }
+  el.innerHTML = html;
+  el.hidden = false;
 }
 
 async function finishGuidedCheckin() {
   try {
     await afterAssessmentSaved();
+    renderCheckinResultsBanner();
   } catch (_) {
     /* refresh optional */
   }
   goTo("tests");
 }
+
+function setAssessmentPath(path, { markPreferred = false, resetWorkflow = true } = {}) {
+  if (path !== "manual" && path !== "vision") return;
+  localStorage.setItem(PATH_KEY, path);
+  if (markPreferred) localStorage.setItem(PREFERRED_PATH_KEY, path);
+  if (resetWorkflow) {
+    localStorage.removeItem(WORKFLOW_STEP_KEY);
+    localStorage.removeItem(WORKFLOW_COMPLETED_KEY);
+  }
+}
+
+function startGuidedCheckin(path = "vision", { markPreferred = false } = {}) {
+  setAssessmentPath(path, { markPreferred, resetWorkflow: true });
+  goTo("guided");
+}
+
+function clearClientAppData() {
+  const keys = [];
+  for (let i = 0; i < localStorage.length; i++) {
+    const k = localStorage.key(i);
+    if (k && k.startsWith("kinspan")) keys.push(k);
+  }
+  keys.forEach((k) => localStorage.removeItem(k));
+  sessionStorage.removeItem(SKIP_ONBOARDING_KEY);
+}
+
+function resetInMemoryAppState() {
+  profiles = [];
+  profile = null;
+  snapshot = null;
+  history = null;
+  treatmentTracker = null;
+  treatmentTrackerUnavailable = false;
+  profileEditingId = null;
+  profileCreateMode = false;
+  ringBuilt = false;
+  graphsBuilt = false;
+  if (ringChart) {
+    ringChart.destroy();
+    ringChart = null;
+  }
+  if (vitalityChart) {
+    vitalityChart.destroy();
+    vitalityChart = null;
+  }
+}
+
+function openResetModal() {
+  const modal = document.getElementById("resetModal");
+  const status = document.getElementById("resetModalStatus");
+  const confirm = document.getElementById("resetModalConfirm");
+  const cancel = document.getElementById("resetModalCancel");
+  if (!modal) return;
+  if (status) {
+    status.hidden = true;
+    status.textContent = "";
+    status.classList.remove("err");
+  }
+  if (confirm) confirm.disabled = false;
+  if (cancel) cancel.disabled = false;
+  modal.hidden = false;
+  modal.removeAttribute("hidden");
+  modal.setAttribute("aria-hidden", "false");
+}
+
+function closeResetModal() {
+  const modal = document.getElementById("resetModal");
+  if (!modal) return;
+  modal.hidden = true;
+  modal.setAttribute("hidden", "");
+  modal.setAttribute("aria-hidden", "true");
+}
+
+async function fetchAllProfiles() {
+  const r = await fetch("/api/profiles", API_FETCH);
+  const text = await r.text();
+  if (!r.ok) throw new Error(apiErrorMessage(text || r.statusText));
+  const data = text ? JSON.parse(text) : {};
+  return Array.isArray(data.profiles) ? data.profiles : [];
+}
+
+async function tryResetRequest(run) {
+  const r = await run();
+  const text = await r.text();
+  if (r.status === 404 || r.status === 405) return false;
+  if (!r.ok) throw new Error(apiErrorMessage(text || r.statusText));
+  return true;
+}
+
+async function deleteProfilesOneByOne(list) {
+  let deleted = 0;
+  for (const p of list) {
+    const id = p.id;
+    if (id == null) continue;
+    const r = await fetch(`/api/profile?profile_id=${encodeURIComponent(id)}`, {
+      ...API_FETCH,
+      method: "DELETE",
+    });
+    const text = await r.text();
+    if (r.status === 404 || r.status === 405) return deleted;
+    if (!r.ok) throw new Error(apiErrorMessage(text || r.statusText));
+    deleted += 1;
+  }
+  return deleted;
+}
+
+async function wipeServerData() {
+  const bulkTries = [
+    () => fetch("/api/reset?full=1", { ...API_FETCH, method: "POST" }),
+    () => fetch("/api/reset-all", { ...API_FETCH, method: "POST" }),
+    () => fetch("/api/profiles", { ...API_FETCH, method: "DELETE" }),
+  ];
+  let lastError = null;
+  let anyOk = false;
+  for (const run of bulkTries) {
+    try {
+      if (await tryResetRequest(run)) anyOk = true;
+    } catch (e) {
+      lastError = e;
+    }
+  }
+
+  let profiles = await fetchAllProfiles().catch((e) => {
+    lastError = e;
+    return null;
+  });
+
+  if (profiles && profiles.length > 0) {
+    try {
+      const n = await deleteProfilesOneByOne(profiles);
+      if (n > 0) anyOk = true;
+      profiles = await fetchAllProfiles();
+    } catch (e) {
+      lastError = e;
+    }
+  }
+
+  if (!profiles || profiles.length === 0) {
+    try {
+      if (await tryResetRequest(() => fetch("/api/reset", { ...API_FETCH, method: "POST" }))) {
+        anyOk = true;
+      }
+    } catch (e) {
+      lastError = e;
+    }
+    return;
+  }
+
+  if (!anyOk) {
+    throw (
+      lastError ||
+      new Error("Reset API not available. Stop and restart the server with server/start.ps1, then try again.")
+    );
+  }
+  throw new Error(
+    "Could not remove all profiles. Stop the app, run server/start.ps1, hard-refresh (Ctrl+Shift+R), then try Reset again."
+  );
+}
+
+async function confirmResetApp() {
+  const confirm = document.getElementById("resetModalConfirm");
+  const cancel = document.getElementById("resetModalCancel");
+  const status = document.getElementById("resetModalStatus");
+  if (confirm) confirm.disabled = true;
+  if (cancel) cancel.disabled = true;
+  if (status) {
+    status.hidden = false;
+    status.textContent = "Clearing profiles and scores on the server…";
+    status.classList.remove("err");
+  }
+  try {
+    await wipeServerData();
+    clearClientAppData();
+    resetInMemoryAppState();
+    const frame = document.getElementById("guidedFrame");
+    if (frame) {
+      frame.removeAttribute("src");
+      frame.src = "about:blank";
+    }
+    if (status) {
+      status.textContent = "Done. Reloading…";
+      status.classList.remove("err");
+    }
+    closeResetModal();
+    window.location.replace("/?reset=" + Date.now());
+  } catch (e) {
+    if (status) {
+      status.textContent = apiErrorMessage(e.message);
+      status.classList.add("err");
+    }
+    if (confirm) confirm.disabled = false;
+    if (cancel) cancel.disabled = false;
+  }
+}
+
+function setupResetApp() {
+  const btn = document.getElementById("appResetBtn");
+  const cancel = document.getElementById("resetModalCancel");
+  const backdrop = document.getElementById("resetModalBackdrop");
+  const confirm = document.getElementById("resetModalConfirm");
+  if (btn && !btn.dataset.resetBound) {
+    btn.dataset.resetBound = "1";
+    btn.addEventListener("click", (e) => {
+      e.preventDefault();
+      e.stopPropagation();
+      openResetModal();
+    });
+  }
+  if (cancel && !cancel.dataset.resetBound) {
+    cancel.dataset.resetBound = "1";
+    cancel.addEventListener("click", closeResetModal);
+  }
+  if (backdrop && !backdrop.dataset.resetBound) {
+    backdrop.dataset.resetBound = "1";
+    backdrop.addEventListener("click", closeResetModal);
+  }
+  if (confirm && !confirm.dataset.resetBound) {
+    confirm.dataset.resetBound = "1";
+    confirm.addEventListener("click", () => confirmResetApp());
+  }
+}
+
+window.openResetModal = openResetModal;
+window.closeResetModal = closeResetModal;
+window.confirmResetApp = confirmResetApp;
 
 function isKinspanMessageEvent(e) {
   if (!e?.data?.type || !String(e.data.type).startsWith("kinspan:")) return false;
@@ -227,8 +563,10 @@ function goTo(id) {
 
   const frame = document.getElementById("guidedFrame");
   if (id === "guided") {
-    if (frame && !String(frame.getAttribute("src") || "").includes("/classic")) {
-      frame.src = "/classic?embed=1";
+    const path = localStorage.getItem(PATH_KEY) || localStorage.getItem(PREFERRED_PATH_KEY) || "vision";
+    const guidedSrc = `/classic?embed=1&path=${encodeURIComponent(path)}`;
+    if (frame && String(frame.getAttribute("src") || "") !== guidedSrc) {
+      frame.src = guidedSrc;
     }
   } else if (frame) {
     frame.removeAttribute("src");
@@ -237,11 +575,24 @@ function goTo(id) {
 
   if (id === "dashboard") renderDashboard();
   if (id === "journal-select") renderJournals();
-  if (id === "tests") renderTestsHub();
+  if (id === "tests") {
+    renderTestsHub();
+    renderCheckinResultsBanner();
+  }
   if (id === "weekly-digest") renderDigest();
   if (id === "doctor-export") renderDoctorExport();
   if (id === "graphs") renderGraphs();
-  if (id === "treatment") renderTreatmentTracker();
+  if (id === "treatment") {
+    if (!snapshot) {
+      loadSnapshot()
+        .catch(() => {
+          snapshot = null;
+        })
+        .finally(() => renderTreatmentTracker());
+    } else {
+      renderTreatmentTracker();
+    }
+  }
   if (id === "walk") resetWalkUi();
   if (id === "chair-rise") resetChairRiseUi();
   if (id === "reaction") resetReactionUi();
@@ -269,7 +620,7 @@ function goSlide(n) {
   document.querySelectorAll(".ob-dot").forEach((d, i) => d.classList.toggle("active", i === n));
   obN = n;
   const btn = document.getElementById("obBtn");
-  if (btn) btn.textContent = n === 3 ? "Go to home →" : "Next";
+  if (btn) btn.textContent = n === 3 ? "Set up parent →" : "Next";
   const p = document.getElementById("obParentHint");
   if (p) p.textContent = parentName;
 }
@@ -291,16 +642,28 @@ function markOnboardingComplete() {
   sessionStorage.setItem(SKIP_ONBOARDING_KEY, "1");
 }
 
+function goToFirstProfileCreate() {
+  profileCreateMode = true;
+  profileEditingId = null;
+  goTo("profile");
+}
+
 function finishOnboarding() {
   markOnboardingComplete();
+  if (!profiles.length) {
+    goToFirstProfileCreate();
+    return;
+  }
   routeAfterAuth();
 }
 
 function routeAfterAuth() {
   if (!profiles.length) {
-    profileCreateMode = true;
-    profileEditingId = null;
-    goTo("journal-select");
+    if (!hasCompletedOnboarding()) {
+      goTo("onboarding");
+      return;
+    }
+    goToFirstProfileCreate();
     return;
   }
   markOnboardingComplete();
@@ -311,7 +674,12 @@ function routeAfterAuth() {
 }
 
 function skipOnboarding() {
-  finishOnboarding();
+  markOnboardingComplete();
+  if (!profiles.length) {
+    goToFirstProfileCreate();
+    return;
+  }
+  routeAfterAuth();
 }
 
 // ---- Journals ----
@@ -438,6 +806,19 @@ function escapeHtml(s) {
     .replace(/>/g, "&gt;");
 }
 
+function citesHtml(citations, opts) {
+  if (typeof formatCitationsHtml !== "function" || !citations?.length) return "";
+  return formatCitationsHtml(citations, opts);
+}
+
+function scoreResultHtml(scores, extraLine) {
+  const extra = extraLine ? `<br>${escapeHtml(extraLine)}` : "";
+  return (
+    `${escapeHtml(scores.label)}: ${scores.score}/100<br>${escapeHtml(scores.interpretation || "")}${extra}` +
+    citesHtml(scores.citations, { className: "cite-list", prefix: "Sources: " })
+  );
+}
+
 // ---- Dashboard ----
 function renderDashboard() {
   const pctEl = document.getElementById("ringPct");
@@ -451,15 +832,21 @@ function renderDashboard() {
 
   if (pctEl) pctEl.textContent = pct != null ? `${Math.round(pct)}%` : "—";
   if (descEl) {
-    descEl.textContent =
-      snapshot?.overall?.headline ||
-      snapshot?.insights?.summary?.slice(0, 80) ||
-      "Run a test to see your longevity summary.";
+    const headline = snapshot?.overall?.headline || snapshot?.insights?.summary?.slice(0, 80);
+    const headlineCites = snapshot?.overall?.citations || snapshot?.insights?.summary_citations;
+    descEl.innerHTML = headline
+      ? escapeHtml(headline) + citesHtml(headlineCites, { className: "cite-list dash-cites", prefix: "Sources: " })
+      : "Run a test to see your longevity summary.";
   }
   if (msgEl) {
-    msgEl.textContent =
-      snapshot?.insights?.conversation_tip?.slice(0, 90) ||
-      '"Small steps today build a steadier tomorrow."';
+    const tip = snapshot?.insights?.conversation_tip?.slice(0, 120);
+    msgEl.innerHTML = tip
+      ? escapeHtml(tip) +
+        citesHtml(snapshot?.insights?.conversation_tip_citations, {
+          className: "cite-list dash-cites",
+          prefix: "Sources: ",
+        })
+      : '"Small steps today build a steadier tomorrow."';
   }
 
   if (linesEl && snapshot?.categories?.length) {
@@ -487,7 +874,10 @@ function renderDashboard() {
           .map(
             (item) =>
               `<li class="task-item-static ${item.done ? "done-preview" : ""}"><strong>${escapeHtml(item.label)}</strong>` +
-              `<p class="task-sub">${escapeHtml(item.cadence)}${item.done ? " · done" : ""}</p></li>`
+              `<p class="task-sub">${escapeHtml(item.cadence)}${item.done ? " · done" : ""}</p>` +
+              (item.detail ? `<p class="task-sub">${escapeHtml(item.detail)}</p>` : "") +
+              citesHtml(item.citations, { className: "cite-list task-sub-cites", prefix: "Sources: " }) +
+              `</li>`
           )
           .join("");
       } else {
@@ -567,7 +957,9 @@ function renderDashboardActionPreview(taskList, pill) {
   taskList.innerHTML = actions
     .map(
       (a) =>
-        `<li class="task-item-static"><strong>${escapeHtml(a.title)}</strong><p class="task-sub">${escapeHtml(a.detail)}</p></li>`
+        `<li class="task-item-static"><strong>${escapeHtml(a.title)}</strong><p class="task-sub">${escapeHtml(a.detail)}</p>` +
+        citesHtml(a.citations, { className: "cite-list task-sub-cites", prefix: "Sources: " }) +
+        `</li>`
     )
     .join("");
 }
@@ -629,11 +1021,13 @@ function renderTrackerItemCard(item) {
   const testBtn = item.test_route
     ? `<button type="button" class="tracker-test-link" data-route="${escapeHtml(item.test_route)}">Run test →</button>`
     : "";
-  const cite = item.citation_url
-    ? `<a class="tracker-cite" href="${escapeHtml(item.citation_url)}" target="_blank" rel="noopener noreferrer">${escapeHtml(item.citation || "Source")}</a>`
-    : item.citation
-      ? `<span class="tracker-cite-text">${escapeHtml(item.citation)}</span>`
-      : "";
+  const cite = item.citations?.length
+    ? citesHtml(item.citations, { className: "cite-list tracker-cite-list", prefix: "Sources: " })
+    : item.citation_url
+      ? `<a class="tracker-cite" href="${escapeHtml(item.citation_url)}" target="_blank" rel="noopener noreferrer">${escapeHtml(item.citation || "Source")}</a>`
+      : item.citation
+        ? `<span class="tracker-cite-text">${escapeHtml(item.citation)}</span>`
+        : "";
   const removeBtn = `<button type="button" class="tracker-remove" data-remove="${escapeHtml(item.id)}" title="${item.custom ? "Remove habit" : "Hide from plan"}">×</button>`;
   const noteVal = escapeHtml(item.note || "");
   return (
@@ -671,6 +1065,7 @@ function renderTreatmentTracker() {
     if (weekEl) weekEl.textContent = `${s.week_pct ?? 0}%`;
     if (monthEl) monthEl.textContent = `${s.month_pct ?? 0}%`;
     if (headlineEl) headlineEl.textContent = s.headline || "";
+    renderTrackerAdvice();
 
     const groups = treatmentTracker?.groups || [];
     if (!groups.length) {
@@ -914,7 +1309,7 @@ function setupWalk() {
     try {
       const res = await apiPost("/api/assessments/gait", { time_seconds: t });
       if (out) {
-        out.textContent = `${res.scores.label}: ${res.scores.score}/100\n${res.scores.interpretation}\nSpeed: ${res.scores.raw.speed_mps} m/s`;
+        out.innerHTML = scoreResultHtml(res.scores, `Speed: ${res.scores.raw.speed_mps} m/s`);
         out.classList.add("show");
       }
       await afterAssessmentSaved();
@@ -991,7 +1386,7 @@ function setupChairRise() {
     try {
       const res = await apiPost("/api/assessments/chair-stand", { rise_time_seconds: t });
       if (out) {
-        out.textContent = `${res.scores.label}: ${res.scores.score}/100\n${res.scores.interpretation}`;
+        out.innerHTML = scoreResultHtml(res.scores);
         out.classList.add("show");
       }
       await afterAssessmentSaved();
@@ -1079,7 +1474,7 @@ function setupReaction() {
     try {
       const res = await apiPost("/api/assessments/reaction", { trials_ms: reactTrials });
       if (out) {
-        out.textContent = `${res.scores.label}: ${res.scores.score}/100\n${res.scores.interpretation}`;
+        out.innerHTML = scoreResultHtml(res.scores);
         out.classList.add("show");
       }
       await afterAssessmentSaved();
@@ -1097,10 +1492,25 @@ function loadProfileForm(editId, creating) {
   const title = document.getElementById("profTitle");
   const sub = document.getElementById("profSub");
   const saveBtn = document.getElementById("saveProf");
+  const backBtn = document.querySelector("#profile .back-btn");
+  const fromIntro = creating && !profiles.length;
+  if (backBtn) {
+    backBtn.textContent = fromIntro ? "← Back to intro" : "← Back";
+    backBtn.onclick = () => {
+      if (fromIntro) goTo("onboarding");
+      else goTo(profiles.length ? "journal-select" : "onboarding");
+    };
+  }
   if (creating) {
-    if (title) title.textContent = "Add parent";
-    if (sub) sub.textContent = "Set up their profile for fair comparisons";
-    if (saveBtn) saveBtn.textContent = "Create profile";
+    if (title) title.textContent = fromIntro ? "Set up your parent" : "Add parent";
+    if (sub) {
+      sub.textContent = fromIntro
+        ? "After you save, we'll start a guided video check-in together."
+        : "Set up their profile for fair comparisons";
+    }
+    if (saveBtn) {
+      saveBtn.textContent = fromIntro ? "Save & start check-in" : "Create profile";
+    }
     document.getElementById("profName").value = "";
     document.getElementById("profAge").value = 68;
     document.getElementById("profSex").value = "female";
@@ -1148,6 +1558,8 @@ function setupProfile() {
     }
     try {
       let p;
+      const wasCreate = profileCreateMode;
+      const isFirstParent = wasCreate && profiles.length === 0;
       if (profileCreateMode) {
         const r = await fetch("/api/profiles", {
           ...API_FETCH,
@@ -1182,7 +1594,11 @@ function setupProfile() {
       }
       markOnboardingComplete();
       renderJournals();
-      setTimeout(() => goTo("dashboard"), 600);
+      if (wasCreate && isFirstParent) {
+        setTimeout(() => startGuidedCheckin("vision", { markPreferred: true }), 600);
+      } else {
+        setTimeout(() => goTo("dashboard"), 600);
+      }
     } catch (e) {
       if (out) {
         out.textContent = apiErrorMessage(e.message);
@@ -1206,7 +1622,11 @@ function renderDigest() {
 
   if (intro) {
     intro.innerHTML = snapshot?.insights?.summary
-      ? `<strong>${escapeHtml(parentName)}:</strong> ${escapeHtml(snapshot.insights.summary)}`
+      ? `<strong>${escapeHtml(parentName)}:</strong> ${escapeHtml(snapshot.insights.summary)}` +
+        citesHtml(snapshot.insights.summary_citations || snapshot.insights.citations, {
+          className: "cite-list insight-cites",
+          prefix: "Sources: ",
+        })
       : `<strong>Start with a check-in.</strong> Run walk, chair, or reaction tests to build your first digest.`;
   }
 
@@ -1233,20 +1653,32 @@ function renderDigest() {
     const cards = [];
     if (snapshot?.insights?.what_changed) {
       cards.push(
-        `<div class="insight-card"><div class="i-dot sage"></div><div class="i-text">${escapeHtml(snapshot.insights.what_changed)}</div></div>`
+        `<div class="insight-card"><div class="i-dot sage"></div><div class="i-text">${escapeHtml(snapshot.insights.what_changed)}` +
+          citesHtml(snapshot.insights.what_changed_citations, {
+            className: "cite-list insight-cites",
+            prefix: "Sources: ",
+          }) +
+          `</div></div>`
       );
     }
     snapshot?.categories?.forEach((c) => {
       cards.push(
-        `<div class="insight-card"><div class="i-dot slate"></div><div class="i-text"><strong>${escapeHtml(c.label)}</strong> — ${c.score}/100. ${escapeHtml(c.trend_detail?.summary || c.interpretation || "")}</div></div>`
+        `<div class="insight-card"><div class="i-dot slate"></div><div class="i-text"><strong>${escapeHtml(c.label)}</strong> — ${c.score}/100. ${escapeHtml(c.trend_detail?.summary || c.interpretation || "")}` +
+          citesHtml(c.citations || c.trend_detail?.citations, {
+            className: "cite-list insight-cites",
+            prefix: "Sources: ",
+          }) +
+          `</div></div>`
       );
     });
     insights.innerHTML = cards.length ? cards.join("") : "<p class='digest-empty'>More insights after your next check-in.</p>";
   }
 
   if (action) {
-    action.textContent = snapshot?.actions?.[0]?.detail
-      || "Complete a check-in to get a personalized suggestion.";
+    const first = snapshot?.actions?.[0];
+    action.innerHTML =
+      (first?.detail ? escapeHtml(first.detail) : "Complete a check-in to get a personalized suggestion.") +
+      citesHtml(first?.citations, { className: "cite-list digest-action-cites", prefix: "Sources: " });
   }
 }
 
@@ -1269,15 +1701,25 @@ function renderDoctorExport() {
       <div class="doc-patient-info"><h4>${escapeHtml(parentName)}, ${age}</h4><p>${total} check-ins logged · KinSpan trends only</p></div>
     </div>
     <div class="doc-section"><h4>Functional movement</h4><div class="doc-grid">
-      <div class="doc-metric"><div class="doc-metric-lbl">Mobility</div><div class="doc-metric-val">${gait ? gait.score + "/100" : "—"}</div><div class="doc-metric-trend">${gait?.trend_detail?.summary || ""}</div></div>
-      <div class="doc-metric"><div class="doc-metric-lbl">Strength</div><div class="doc-metric-val">${chair ? chair.score + "/100" : "—"}</div><div class="doc-metric-trend">${chair?.trend_detail?.summary || ""}</div></div>
-      <div class="doc-metric"><div class="doc-metric-lbl">Cognitive speed</div><div class="doc-metric-val">${cog ? cog.score + "/100" : "—"}</div><div class="doc-metric-trend">${cog?.trend_detail?.summary || ""}</div></div>
+      <div class="doc-metric"><div class="doc-metric-lbl">Mobility</div><div class="doc-metric-val">${gait ? gait.score + "/100" : "—"}</div><div class="doc-metric-trend">${escapeHtml(gait?.trend_detail?.summary || "")}${citesHtml(gait?.citations, { className: "cite-list doc-cites", prefix: "" })}</div></div>
+      <div class="doc-metric"><div class="doc-metric-lbl">Strength</div><div class="doc-metric-val">${chair ? chair.score + "/100" : "—"}</div><div class="doc-metric-trend">${escapeHtml(chair?.trend_detail?.summary || "")}${citesHtml(chair?.citations, { className: "cite-list doc-cites", prefix: "" })}</div></div>
+      <div class="doc-metric"><div class="doc-metric-lbl">Cognitive speed</div><div class="doc-metric-val">${cog ? cog.score + "/100" : "—"}</div><div class="doc-metric-trend">${escapeHtml(cog?.trend_detail?.summary || "")}${citesHtml(cog?.citations, { className: "cite-list doc-cites", prefix: "" })}</div></div>
     </div></div>
     <div class="doc-section"><h4>Vitality</h4><div class="doc-grid">
       <div class="doc-metric"><div class="doc-metric-lbl">Overall score</div><div class="doc-metric-val">${overall} / 100</div></div>
       <div class="doc-metric"><div class="doc-metric-lbl">Functional age est.</div><div class="doc-metric-val">${funcAge} yrs</div></div>
     </div></div>
-    <div class="doc-section"><h4>Caregiver note</h4><div class="doc-note">${escapeHtml(snapshot.insights?.conversation_tip || "No additional notes.")}</div></div>
+    <div class="doc-section"><h4>Caregiver note</h4><div class="doc-note">${escapeHtml(snapshot.insights?.conversation_tip || "No additional notes.")}${citesHtml(snapshot.insights?.conversation_tip_citations, { className: "cite-list doc-cites", prefix: "Sources: " })}</div></div>
+    ${
+      (snapshot.interventions || []).length
+        ? `<div class="doc-section"><h4>Evidence-based ideas</h4><ul class="doc-advice-list">${(snapshot.interventions || [])
+            .map(
+              (inv) =>
+                `<li><strong>${escapeHtml(inv.title)}</strong> — ${escapeHtml(inv.suggestion || "")}${citesHtml(inv.citation ? [inv.citation] : [], { className: "cite-list doc-cites", prefix: "Sources: " })}</li>`
+            )
+            .join("")}</ul></div>`
+        : ""
+    }
   `;
 }
 
@@ -1292,9 +1734,10 @@ function renderGraphs(force) {
   if (exp) {
     const diff = age - funcAge;
     exp.innerHTML =
-      diff > 0
+      (diff > 0
         ? `${escapeHtml(parentName)}'s signals suggest function closer to someone about <strong>${diff} years younger</strong> than chronological age.`
-        : `Keep logging check-ins to refine the biological age estimate.`;
+        : `Keep logging check-ins to refine the biological age estimate.`) +
+      citesHtml(snapshot?.overall?.citations, { className: "cite-list", prefix: "Sources: " });
   }
 
   const scores = [];
@@ -1358,6 +1801,7 @@ async function init() {
   setupReaction();
   setupProfile();
   setupTreatmentTracker();
+  setupResetApp();
 
   try {
     await loadProfiles();
@@ -1381,10 +1825,12 @@ async function init() {
     t("toastDash", "API offline — start server on port 8003");
   }
 
-  if (profiles.length > 0 || hasCompletedOnboarding()) {
+  if (profiles.length > 0) {
     routeAfterAuth();
-  } else {
+  } else if (!hasCompletedOnboarding()) {
     goTo("onboarding");
+  } else {
+    goToFirstProfileCreate();
   }
 
   apiGet("/api/health")

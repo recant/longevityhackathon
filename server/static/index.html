@@ -67,8 +67,16 @@
       background: var(--card); cursor: pointer; font-family: inherit; box-shadow: 0 4px 12px rgba(0,0,0,.05);
     }
     .path-card.selected { border-color: var(--primary); background: var(--primary-soft); }
+    .path-card.preferred { box-shadow: 0 4px 12px rgba(107, 143, 113, 0.18); }
+    .path-preferred-tag {
+      display: inline-block; margin-left: 0.35rem; padding: 0.1rem 0.4rem; font-size: 0.62rem;
+      font-weight: 700; letter-spacing: 0.04em; text-transform: uppercase; vertical-align: middle;
+      color: var(--secondary); background: var(--primary-soft); border-radius: 4px;
+    }
     .path-card strong { display: block; margin-bottom: 0.25rem; }
     .path-card span { font-size: 0.82rem; color: var(--muted); }
+    .cite-list { font-size: 0.78rem; color: var(--muted); margin: 0.35rem 0 0; line-height: 1.45; }
+    .cite-link { color: var(--secondary); }
     .video-wrap { background: #1a2428; border-radius: var(--radius); overflow: hidden; margin: 0.75rem 0; aspect-ratio: 4/3; position: relative; }
     .video-wrap video { width: 100%; height: 100%; object-fit: cover; }
     .record-bar {
@@ -150,12 +158,12 @@
 
     <h2 class="path-picker-heading" style="font-size:1rem;margin:0.75rem 0 0.35rem">Choose assessment path</h2>
     <div class="path-cards">
-      <button type="button" class="path-card selected" id="pickManual">
+      <button type="button" class="path-card" id="pickManual">
         <strong>At-home tests</strong>
         <span>Timer, tap reaction, chair counter — no video.</span>
       </button>
       <button type="button" class="path-card" id="pickVision">
-        <strong>Video analysis</strong>
+        <strong>Video analysis <span class="path-preferred-tag" id="visionPreferredTag" hidden>Preferred</span></strong>
         <span>Computer vision for walk &amp; chair — optional tap test.</span>
       </button>
     </div>
@@ -280,6 +288,7 @@
   </div>
 
   <script src="/format-api-error.js"></script>
+  <script src="/citations-ui.js"></script>
   <script>
     const API = "";
     async function api(path, opts = {}) {
@@ -297,7 +306,25 @@
 
     function showResult(el, data) {
       el.style.display = "block";
+      el.className = "result";
       el.textContent = typeof data === "string" ? data : JSON.stringify(data, null, 2);
+    }
+
+    function scoreResultHtml(scores, extraLine) {
+      const extra = extraLine ? "<br>" + escapeHtml(extraLine) : "";
+      const cites =
+        typeof formatCitationsHtml === "function" && scores.citations
+          ? formatCitationsHtml(scores.citations, { className: "cite-list", prefix: "Sources: " })
+          : "";
+      return (
+        escapeHtml(scores.label) + ": " + scores.score + "/100<br>" + escapeHtml(scores.interpretation || "") + extra + cites
+      );
+    }
+
+    function showScoreResult(el, scores, extraLine) {
+      el.style.display = "block";
+      el.className = "result";
+      el.innerHTML = scoreResultHtml(scores, extraLine);
     }
 
     const IS_EMBED =
@@ -375,11 +402,25 @@
       },
     };
 
-    let currentPath = localStorage.getItem("kinspan_path") || "manual";
+    const PREFERRED_PATH_KEY = "kinspan_preferred_path";
+    const urlPath = new URLSearchParams(location.search).get("path");
+    let currentPath =
+      (urlPath === "vision" || urlPath === "manual" ? urlPath : null) ||
+      localStorage.getItem("kinspan_path") ||
+      localStorage.getItem(PREFERRED_PATH_KEY) ||
+      "manual";
     const pickManual = document.getElementById("pickManual");
     const pickVision = document.getElementById("pickVision");
+    const visionPreferredTag = document.getElementById("visionPreferredTag");
     const COMPLETED_KEY = "kinspan_completed";
     const STEP_KEY = "kinspan_workflow_step";
+
+    function updatePreferredUi() {
+      const preferred = localStorage.getItem(PREFERRED_PATH_KEY);
+      const isVisionPreferred = preferred === "vision";
+      if (visionPreferredTag) visionPreferredTag.hidden = !isVisionPreferred;
+      pickVision?.classList.toggle("preferred", isVisionPreferred);
+    }
 
     function getWorkflow() {
       return currentPath === "vision" ? VISION_WORKFLOW : MANUAL_WORKFLOW;
@@ -484,6 +525,7 @@
       pickManual.classList.toggle("selected", currentPath === "manual");
       pickVision.classList.toggle("selected", currentPath === "vision");
       localStorage.setItem("kinspan_path", currentPath);
+      updatePreferredUi();
       const steps = getWorkflow();
       if (stepIndex >= steps.length) stepIndex = 0;
       renderWorkflowUI();
@@ -542,10 +584,14 @@
     function showCvSummary(el, scores) {
       el.style.display = "block";
       el.className = "result cv-result-summary";
+      const cites =
+        typeof formatCitationsHtml === "function" && scores.citations
+          ? formatCitationsHtml(scores.citations, { className: "cite-list", prefix: "Sources: " })
+          : "";
       el.innerHTML =
         '<div class="score-big">' + scores.score + '<span style="font-size:1rem;font-weight:700">/100</span></div>' +
         '<p class="cv-label">' + escapeHtml(scores.label || "Score") + '</p>' +
-        '<p class="cv-summary">' + escapeHtml(scores.interpretation || "") + '</p>';
+        '<p class="cv-summary">' + escapeHtml(scores.interpretation || "") + '</p>' + cites;
     }
     function escapeHtml(s) {
       return String(s).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
@@ -836,7 +882,7 @@
       const out = document.getElementById("reactOut");
       try {
         const res = await api("/api/assessments/reaction", { method: "POST", body: { trials_ms: reactTrials } });
-        showResult(out, res.scores.label + ": " + res.scores.score + "/100\n" + res.scores.interpretation);
+        showScoreResult(out, res.scores);
         markComplete("reaction");
       } catch (e) { showResult(out, e.message); }
     };
@@ -930,8 +976,7 @@
       const out = document.getElementById("walkOut");
       try {
         const res = await api("/api/assessments/gait", { method: "POST", body: { time_seconds: t } });
-        showResult(out, res.scores.label + ": " + res.scores.score + "/100\n" + res.scores.interpretation +
-          "\nSpeed: " + res.scores.raw.speed_mps + " m/s");
+        showScoreResult(out, res.scores, "Speed: " + res.scores.raw.speed_mps + " m/s");
         markComplete("walk");
       } catch (e) { showResult(out, e.message); }
     };
@@ -983,7 +1028,7 @@
       if (!t || t < 0.4) { showResult(out, "Time one full stand first."); return; }
       try {
         const res = await api("/api/assessments/chair-stand", { method: "POST", body: { rise_time_seconds: t } });
-        showResult(out, res.scores.label + ": " + res.scores.score + "/100\n" + res.scores.interpretation);
+        showScoreResult(out, res.scores);
         markComplete("chair");
       } catch (e) { showResult(out, e.message); }
     };
@@ -998,21 +1043,52 @@
         if (s.overall.overall_score != null) {
           html += "<div class='score-big'>" + s.overall.overall_score + "</div>";
           html += "<p>" + s.overall.headline + "</p>";
+          html += (typeof formatCitationsHtml === "function" ? formatCitationsHtml(s.overall.citations) : "");
           html += "<p class='hint'>Age " + s.overall.chronological_age + " · Functional ~" + s.overall.overall_functional_age + "</p>";
         } else html += "<p>Complete all three check-ins first.</p>";
         html += "</div>";
         (s.categories || []).forEach((c) => {
           html += "<div class='card-row'><strong>" + c.label + "</strong> " + c.score + "/100<br>" + c.interpretation;
-          if (c.trend_detail) html += "<br><em>" + c.trend_detail.summary + "</em>";
+          if (c.trend_detail) {
+            html += "<br><em>" + c.trend_detail.summary + "</em>";
+            html += typeof formatCitationsHtml === "function"
+              ? formatCitationsHtml(c.trend_detail.citations, { prefix: "Sources: " })
+              : "";
+          }
+          html += typeof formatCitationsHtml === "function"
+            ? formatCitationsHtml(c.citations, { prefix: "Sources: " })
+            : "";
           html += "</div>";
         });
         if (s.insights) {
-          html += "<div class='result'><strong>Family explanation</strong><br>" + s.insights.summary +
-            "<br><br><strong>Conversation tip</strong><br>" + s.insights.conversation_tip + "</div>";
+          html += "<div class='result'><strong>Family explanation</strong><br>" + s.insights.summary;
+          html += typeof formatCitationsHtml === "function"
+            ? formatCitationsHtml(s.insights.summary_citations || s.insights.citations)
+            : "";
+          html += "<br><br><strong>Conversation tip</strong><br>" + s.insights.conversation_tip;
+          html += typeof formatCitationsHtml === "function"
+            ? formatCitationsHtml(s.insights.conversation_tip_citations)
+            : "";
+          html += "</div>";
+        }
+        if (s.interventions?.length) {
+          html += "<h3 style='margin-top:1rem'>Evidence-based ideas</h3><ul>";
+          s.interventions.forEach((inv) => {
+            html += "<li><strong>" + inv.title + "</strong> — " + inv.suggestion;
+            html += typeof formatCitationsHtml === "function" && inv.citation
+              ? formatCitationsHtml([inv.citation])
+              : "";
+            html += "</li>";
+          });
+          html += "</ul>";
         }
         if (s.actions) {
           html += "<h3 style='margin-top:1rem'>Actions</h3><ul>";
-          s.actions.forEach((a) => { html += "<li><strong>" + a.title + "</strong> — " + a.detail + "</li>"; });
+          s.actions.forEach((a) => {
+            html += "<li><strong>" + a.title + "</strong> — " + a.detail;
+            html += typeof formatCitationsHtml === "function" ? formatCitationsHtml(a.citations) : "";
+            html += "</li>";
+          });
           html += "</ul>";
         }
         out.innerHTML = html;

@@ -51,8 +51,8 @@
           <path d="M23 9L27.5 18L38 19.5L30.5 26.5L32.5 37L23 32L13.5 37L15.5 26.5L8 19.5L18.5 18L23 9Z" fill="#C9A84C" opacity="0.85"/>
         </svg>
       </div>
-      <h2>You're all set</h2>
-      <p>Head to your home screen to explore check-ins, weekly digests, and gentle tests when you and <span id="obParentHint">your parent</span> are ready.</p>
+      <h2>You're ready to begin</h2>
+      <p>Next you'll add <span id="obParentHint">your parent</span>'s profile, then we'll walk you through a full check-in with <strong>video analysis</strong> — our recommended way to capture walk and chair signals together.</p>
     </div>
   </div>
   <div class="ob-dots">
@@ -194,6 +194,7 @@
       <h2>Treatment plan</h2>
       <p id="trackerSub">Personal plan for <span data-parent-name>your parent</span></p>
       <p class="tracker-headline" id="trackerHeadline"></p>
+      <div class="tracker-advice-block" id="trackerAdvice" hidden></div>
     </div>
     <div class="tracker-summary">
       <div class="tracker-stat"><div class="tracker-stat-val" id="trackerToday">0/0</div><div class="tracker-stat-lbl">Today</div></div>
@@ -241,6 +242,7 @@
     <div class="tests-sub" id="testsSub">The first steps of their Longevity Journey</div>
   </div>
   <div class="tests-scroll">
+  <section class="checkin-results-banner" id="testsCheckinResults" hidden aria-live="polite"></section>
   <div class="test-tiles">
     <div class="test-tile t-blue" onclick="goTo('walk')"><div class="ttile-hdr">Walking Pace ›</div><div class="ttile-body">Time a normal 10-foot walk</div></div>
     <div class="test-tile t-terra" onclick="goTo('chair-rise')"><div class="ttile-hdr">Sit &amp; Stand ›</div><div class="ttile-body">Time one smooth sit-to-stand</div></div>
@@ -444,9 +446,33 @@
   </div>
 </div>
 
+  <div class="app-chrome" id="appChrome">
+    <button type="button" class="app-reset-btn" id="appResetBtn" aria-haspopup="dialog">Reset app</button>
+    <div class="reset-modal" id="resetModal" role="dialog" aria-modal="true" aria-labelledby="resetModalTitle" hidden>
+      <div class="reset-modal-backdrop" id="resetModalBackdrop"></div>
+      <div class="reset-modal-panel">
+        <h2 id="resetModalTitle">Reset everything?</h2>
+        <p class="reset-modal-lead">This cannot be undone. You will lose:</p>
+        <ul class="reset-modal-list">
+          <li>All parent profiles on this device</li>
+          <li>Check-in history, test results, and videos</li>
+          <li>Treatment plans and saved preferences</li>
+          <li>Browser cache for this app (paths, onboarding, active profile)</li>
+        </ul>
+        <p class="reset-modal-note">The server database for this app will be wiped. You will return to the welcome intro.</p>
+        <div class="reset-modal-actions">
+          <button type="button" class="reset-modal-cancel" id="resetModalCancel">Cancel</button>
+          <button type="button" class="reset-modal-confirm" id="resetModalConfirm">Clear all data</button>
+        </div>
+        <p class="reset-modal-status" id="resetModalStatus" hidden></p>
+      </div>
+    </div>
+  </div>
+
 </div>
 
 <script src="/format-api-error.js"></script>
-<script src="/v2/kinspan-app.js"></script>
+<script src="/citations-ui.js"></script>
+<script src="/v2/kinspan-app.js?v=cites-scroll-1"></script>
 </body>
 </html>

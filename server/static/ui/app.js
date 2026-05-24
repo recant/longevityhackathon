@@ -176,7 +176,11 @@ function renderDashboard() {
       snapshot.categories.map((cat) => {
         const trend = cat.trend_detail?.trend ?? "stable";
         const arrow = trend === "improving" ? "↑" : trend === "watch_closely" ? "↓" : "→";
-        return `<li><strong>${cat.label}</strong> — ${cat.score}/100 ${arrow} ${cat.trend_detail?.summary || ""}</li>`;
+        const cites =
+          typeof formatCitationsHtml === "function"
+            ? formatCitationsHtml(cat.citations || cat.trend_detail?.citations, { prefix: "" })
+            : "";
+        return `<li><strong>${cat.label}</strong> — ${cat.score}/100 ${arrow} ${cat.trend_detail?.summary || ""}${cites}</li>`;
       }).join("") + "</ul>";
   }
 
@@ -184,7 +188,9 @@ function renderDashboard() {
     <div class="summary-row">
       <div>
         <p style="margin:0 0 0.5rem">${snapshot.overall.headline || ""}</p>
+        ${typeof formatCitationsHtml === "function" ? formatCitationsHtml(snapshot.overall?.citations, { prefix: "" }) : ""}
         ${snapshot.insights?.summary ? `<p class="hub-tag">${snapshot.insights.summary}</p>` : ""}
+        ${typeof formatCitationsHtml === "function" ? formatCitationsHtml(snapshot.insights?.summary_citations, { prefix: "" }) : ""}
         <p class="hub-tag">Functional ~${snapshot.overall.overall_functional_age} · Age ${snapshot.overall.chronological_age}</p>
       </div>
       <div class="donut-wrap">
@@ -199,9 +205,15 @@ function renderDashboard() {
   // tasks modal
   const taskList = document.getElementById("taskList");
   if (snapshot.actions?.length) {
-    taskList.innerHTML = snapshot.actions.map((a) =>
-      `<li><strong>${a.title}</strong><p class="hub-tag">${a.detail}</p></li>`
-    ).join("");
+    taskList.innerHTML = snapshot.actions
+      .map((a) => {
+        const cites =
+          typeof formatCitationsHtml === "function"
+            ? formatCitationsHtml(a.citations, { prefix: "" })
+            : "";
+        return `<li><strong>${a.title}</strong><p class="hub-tag">${a.detail}</p>${cites}</li>`;
+      })
+      .join("");
   }
 }
 

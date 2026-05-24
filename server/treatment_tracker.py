@@ -7,6 +7,7 @@ import uuid
 from datetime import date, datetime, timedelta, timezone
 from typing import Any
 
+from citations import BIOMARKER_CITATION_KEYS, get_citations
 from interventions import generate_interventions
 from scoring import TRACKING_CHECKLIST, default_actions
 
@@ -115,6 +116,7 @@ def build_treatment_items(
 
     for inv in generate_interventions(categories, profile):
         cit = inv.get("citation") or {}
+        cites = [cit] if cit else []
         add(
             {
                 "id": str(inv["id"]),
@@ -126,6 +128,7 @@ def build_treatment_items(
                 "cadence_key": "daily",
                 "citation": cit.get("short"),
                 "citation_url": cit.get("url"),
+                "citations": cites,
                 "severity": inv.get("severity"),
                 "category": inv.get("category"),
                 "test_route": None,
@@ -136,6 +139,8 @@ def build_treatment_items(
 
     for act in actions or default_actions(categories):
         aid = f"action-{_slug(act.get('title', 'habit'))}"
+        act_cites = act.get("citations") or []
+        first = act_cites[0] if act_cites else {}
         add(
             {
                 "id": aid,
@@ -145,8 +150,9 @@ def build_treatment_items(
                 "rationale": "",
                 "cadence": "Weekly",
                 "cadence_key": "weekly",
-                "citation": None,
-                "citation_url": None,
+                "citation": first.get("short"),
+                "citation_url": first.get("url"),
+                "citations": act_cites,
                 "severity": None,
                 "category": None,
                 "test_route": None,
@@ -164,17 +170,25 @@ def build_treatment_items(
     for row in TRACKING_CHECKLIST:
         cid = row["id"]
         cadence_key = _cadence_key(row.get("cadence", "Monthly"))
+        if row.get("biomarker"):
+            bio_cites = get_citations(*BIOMARKER_CITATION_KEYS.get(cid, []))
+            rationale = "Repeat on schedule to spot trends between doctor visits."
+        else:
+            bio_cites = get_citations("longitudinal_tracking")
+            rationale = "Regular self-tracking helps families notice gradual changes between visits."
+        bio_first = bio_cites[0] if bio_cites else {}
         add(
             {
                 "id": f"track-{cid}",
                 "group": "monitoring" if row.get("biomarker") else "wellness",
                 "label": labels.get(cid, row["label"]),
                 "detail": row["label"] if labels.get(cid) else "",
-                "rationale": "Repeat on schedule to spot trends between doctor visits.",
+                "rationale": rationale,
                 "cadence": row.get("cadence", "Monthly"),
                 "cadence_key": cadence_key,
-                "citation": None,
-                "citation_url": None,
+                "citation": bio_first.get("short"),
+                "citation_url": bio_first.get("url"),
+                "citations": bio_cites,
                 "severity": None,
                 "category": cid,
                 "test_route": test_routes.get(cid) if row.get("biomarker") else None,
@@ -194,8 +208,9 @@ def build_treatment_items(
                 "rationale": "Monthly biomarkers build a trajectory families can discuss with clinicians.",
                 "cadence": "Monthly",
                 "cadence_key": "monthly",
-                "citation": None,
-                "citation_url": None,
+                "citation": "Studenski et al., JAMA 2011",
+                "citation_url": "https://doi.org/10.1001/jama.2010.1923",
+                "citations": get_citations("longitudinal_tracking", "studenski_gait_2011"),
                 "test_route": "guided",
                 "custom": False,
                 "priority": 2,

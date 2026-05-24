@@ -10,6 +10,33 @@ from typing import Any
 
 from openai import OpenAI
 
+from citations import CATEGORY_CITATION_KEYS, get_citations
+
+
+def _insight_citation_keys(snapshot: dict[str, Any]) -> list[str]:
+    keys: list[str] = []
+    for cat in snapshot.get("categories") or []:
+        keys.extend(CATEGORY_CITATION_KEYS.get(cat.get("category") or "", []))
+    return list(dict.fromkeys(keys)) or ["longitudinal_tracking"]
+
+
+def enrich_insights(insights: dict[str, Any], snapshot: dict[str, Any]) -> dict[str, Any]:
+    """Attach peer-reviewed citations to each insight field for UI display."""
+    base = _insight_citation_keys(snapshot)
+    out = dict(insights)
+    out["citations"] = get_citations(*base)
+    if out.get("summary"):
+        out["summary_citations"] = get_citations(
+            *list(dict.fromkeys(base + ["studenski_gait_2011", "life_physical_activity"]))
+        )
+    if out.get("conversation_tip"):
+        out["conversation_tip_citations"] = get_citations("longitudinal_tracking")
+    if out.get("what_changed"):
+        out["what_changed_citations"] = get_citations(
+            *list(dict.fromkeys(base + ["longitudinal_tracking"]))
+        )
+    return out
+
 
 def _mock_insight(profile: dict[str, Any], snapshot: dict[str, Any]) -> dict[str, Any]:
     name = profile.get("display_name", "your parent")
@@ -18,18 +45,21 @@ def _mock_insight(profile: dict[str, Any], snapshot: dict[str, Any]) -> dict[str
     if cats:
         parts = [f"{c['label']}: {c['score']}/100" for c in cats]
         what = "Latest: " + "; ".join(parts) + ". Trends appear after your second monthly check-in."
-    return {
-        "summary": (
-            f"{name}'s check-ins are saved. Set ANTHROPIC_API_KEY, OLLAMA_API_KEY, or OPENAI_API_KEY "
-            "for personalized 'explain like a caring family member' text."
-        ),
-        "conversation_tip": (
-            f"Try: '{name}, I found a calm app that helps our family notice energy and "
-            "movement over time — not doctors, just trends. Want to do a short walk test with me?'"
-        ),
-        "what_changed": what,
-        "mock": True,
-    }
+    return enrich_insights(
+        {
+            "summary": (
+                f"{name}'s check-ins are saved. Set ANTHROPIC_API_KEY, OLLAMA_API_KEY, or OPENAI_API_KEY "
+                "for personalized 'explain like a caring family member' text."
+            ),
+            "conversation_tip": (
+                f"Try: '{name}, I found a calm app that helps our family notice energy and "
+                "movement over time — not doctors, just trends. Want to do a short walk test with me?'"
+            ),
+            "what_changed": what,
+            "mock": True,
+        },
+        snapshot,
+    )
 
 
 def _insight_prompt(profile: dict[str, Any], snapshot: dict[str, Any]) -> str:
@@ -47,7 +77,7 @@ Parent: {profile.get('display_name')}, age {profile.get('age', 'unknown')}.
 Snapshot JSON:
 {json.dumps(snapshot, indent=2)}
 
-Return ONLY JSON:
+Return ONLY JSON (do not include citation lists — the server attaches sources):
 {{
   "summary": "2-3 sentences, plain language, trajectory-focused not disease-focused",
   "conversation_tip": "1-2 sentences: how to talk to parent without sounding judgmental",
@@ -60,7 +90,7 @@ def _parse_insight_json(text: str, profile: dict[str, Any], snapshot: dict[str, 
         start = text.index("{")
         data = json.loads(text[start:])
         data["mock"] = False
-        return data
+        return enrich_insights(data, snapshot)
     except (ValueError, json.JSONDecodeError):
         return _mock_insight(profile, snapshot)
 
