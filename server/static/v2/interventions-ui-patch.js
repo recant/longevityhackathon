@@ -97,7 +97,7 @@
 
   function demoInterventionHtml() {
     return `
-      <li class="task-item-static" data-source="demo-intervention">
+      <li class="task-item-static" data-source="demo-intervention" id="demoInterventionTask">
         <strong>Demo intervention: daily walk + breakfast sit-to-stands</strong>
         <p class="task-sub">Started after Week 4. The graph shows an observed improvement after this habit began; for the pitch, describe this as a trajectory signal, not proof of causation.</p>
         <p class="task-sub"><strong>Evidence:</strong> Pahor et al., JAMA 2014 · DOI: 10.1001/jama.2014.5616</p>
@@ -242,13 +242,69 @@
   function renderDemoTasks() {
     if (!DEMO_MODE) return;
     const taskList = document.getElementById('taskList');
-    if (taskList) {
+    if (taskList && !document.getElementById('demoInterventionTask')) {
       taskList.insertAdjacentHTML('afterbegin', demoInterventionHtml());
     }
     const digestAction = document.getElementById('digestAction');
     if (digestAction) {
       digestAction.innerHTML = 'Continue the daily walk + breakfast sit-to-stand habit this week.<br><br><span style="font-size:11px;opacity:.78"><strong>Demo evidence:</strong> Pahor et al., JAMA 2014 · DOI: 10.1001/jama.2014.5616</span>';
     }
+  }
+
+  function completeEmbeddedGuidedCheckin() {
+    try {
+      window.postMessage({ type: 'kinspan:assessment-saved' }, location.origin);
+    } catch (_) {
+      // no-op
+    }
+    Promise.resolve()
+      .then(() => loadSnapshot())
+      .catch(() => null)
+      .finally(() => {
+        if (typeof window.goTo === 'function') {
+          window.goTo('dashboard');
+        }
+      });
+  }
+
+  function patchGuidedFinishButton() {
+    const frame = document.getElementById('guidedFrame');
+    if (!frame) return;
+
+    const apply = () => {
+      let doc;
+      try {
+        doc = frame.contentDocument || frame.contentWindow?.document;
+      } catch (_) {
+        return;
+      }
+      if (!doc) return;
+
+      const btn = doc.getElementById('wfContinue');
+      if (!btn || btn.dataset.parentFinishPatch === '1') return;
+      btn.dataset.parentFinishPatch = '1';
+
+      btn.addEventListener(
+        'click',
+        (event) => {
+          const label = String(btn.textContent || '').trim().toLowerCase();
+          const resultsShown = doc.getElementById('dash')?.classList.contains('show');
+          if (label !== 'finish' && !resultsShown) return;
+
+          event.preventDefault();
+          event.stopImmediatePropagation();
+          completeEmbeddedGuidedCheckin();
+        },
+        true
+      );
+    };
+
+    frame.addEventListener('load', () => {
+      setTimeout(apply, 150);
+      setTimeout(apply, 600);
+    });
+    setTimeout(apply, 150);
+    setTimeout(apply, 600);
   }
 
   function scheduleRender() {
@@ -268,6 +324,7 @@
       const result = oldGoTo.apply(this, arguments);
       if (id === 'dashboard' || id === 'weekly-digest') scheduleRender();
       if (id === 'graphs') scheduleDemoGraph();
+      if (id === 'guided') patchGuidedFinishButton();
       return result;
     };
   }
@@ -292,11 +349,14 @@
     scheduleRender();
     installDemoTag();
     scheduleDemoGraph();
+    patchGuidedFinishButton();
   });
   window.addEventListener('focus', () => {
     scheduleRender();
     scheduleDemoGraph();
+    patchGuidedFinishButton();
   });
   scheduleRender();
   installDemoTag();
+  patchGuidedFinishButton();
 })();
