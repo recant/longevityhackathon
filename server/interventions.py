@@ -15,6 +15,7 @@ Intervention = dict[str, Any]
 CITATIONS: dict[str, Citation] = {
     "life_physical_activity": {
         "short": "Pahor et al., JAMA 2014",
+        "display": "Pahor et al., Effect of Structured Physical Activity",
         "full": (
             "Pahor M, Guralnik JM, Ambrosius WT, et al. Effect of structured physical "
             "activity on prevention of major mobility disability in older adults: the LIFE "
@@ -26,6 +27,7 @@ CITATIONS: dict[str, Citation] = {
     },
     "falls_exercise": {
         "short": "Sherrington et al., Br J Sports Med 2017",
+        "display": "Sherrington et al., Exercise to Prevent Falls",
         "full": (
             "Sherrington C, Michaleff ZA, Fairhall N, et al. Exercise to prevent falls "
             "in older adults: an updated systematic review and meta-analysis. British "
@@ -37,6 +39,7 @@ CITATIONS: dict[str, Citation] = {
     },
     "protein_older_adults": {
         "short": "Bauer et al., J Am Med Dir Assoc 2013",
+        "display": "Bauer et al., Optimal Dietary Protein Intake in Older People",
         "full": (
             "Bauer J, Biolo G, Cederholm T, et al. Evidence-based recommendations for "
             "optimal dietary protein intake in older people: a position paper from the "
@@ -49,6 +52,7 @@ CITATIONS: dict[str, Citation] = {
     },
     "aerobic_cognition": {
         "short": "Smith et al., Psychosom Med 2010",
+        "display": "Smith et al., Aerobic Exercise and Neurocognitive Performance",
         "full": (
             "Smith PJ, Blumenthal JA, Hoffman BM, et al. Aerobic exercise and "
             "neurocognitive performance: a meta-analytic review of randomized controlled "
@@ -60,6 +64,7 @@ CITATIONS: dict[str, Citation] = {
     },
     "mediterranean_cognition": {
         "short": "Martinez-Lapiscina et al., JNNP 2013",
+        "display": "Martinez-Lapiscina et al., Mediterranean Diet Improves Cognition",
         "full": (
             "Martinez-Lapiscina EH, Clavero P, Toledo E, et al. Mediterranean diet "
             "improves cognition: the PREDIMED-NAVARRA randomised trial. Journal of "
