@@ -119,7 +119,7 @@ def _make(
         "category": category,
         "score": score,
         "severity": _severity(score),
-        "trigger": f"{category.replace('_', ' ').title()} score {score:.1f}/100" if score is not None else "No score recorded yet",
+        "trigger": f"{category.replace('_', ' ').title()} score {score:.1f}/100" if score is not None else "Completed check-in",
         "title": title,
         "suggestion": suggestion,
         "rationale": rationale,
@@ -207,6 +207,20 @@ def generate_interventions(
                 suggestion="Once per day, make the meal more Mediterranean-style: vegetables or fruit, beans or whole grains, nuts or olive oil, and fish or lean protein when possible.",
                 rationale="The PREDIMED-NAVARRA randomized trial reported cognitive benefits from a Mediterranean dietary pattern in older adults at cardiovascular risk.",
                 citation_key="mediterranean_cognition",
+            )
+        )
+
+    if not ideas:
+        avg = sum(float(c.get("score", 0)) for c in categories if c.get("score") is not None) / max(1, len(categories))
+        ideas.append(
+            _make(
+                id="daily-walk-and-stand-routine",
+                category="overall",
+                score=avg,
+                title="Start a daily walk and stand routine",
+                suggestion="Choose one small repeatable habit: a 10-minute comfortable walk or 5 slow sit-to-stands from a sturdy chair after breakfast.",
+                rationale="Structured physical activity programs centered on walking plus strength, balance, and flexibility have randomized-trial evidence for preserving mobility in older adults.",
+                citation_key="life_physical_activity",
             )
         )
 
