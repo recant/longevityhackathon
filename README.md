@@ -42,6 +42,15 @@ Optional `OPENAI_API_KEY` adds “explain like a caring family member” + conve
 
 See [HACKATHON.md](./HACKATHON.md) for pitch and [REFERENCES.md](./REFERENCES.md) for full bibliography.
 
+## Share privately (demo link)
+
+Keep the repo **private** on GitHub but give others a password-protected URL:
+
+1. Follow **[DEPLOY.md](./DEPLOY.md)** — deploy to Render from the private repo with `SHARE_USER` / `SHARE_PASSWORD`.
+2. Share only the HTTPS link and credentials (not the repo).
+
+`/api/health` stays open for uptime checks; everything else requires login when share auth is enabled.
+
 ## Run / test via GitHub
 
 ### Automated tests (GitHub Actions)

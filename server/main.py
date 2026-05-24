@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import os
 import shutil
 import uuid
 from pathlib import Path
@@ -50,6 +51,7 @@ from scoring import (
     score_gait_from_cv,
     score_reaction,
 )
+from share_auth import ShareAuthMiddleware, share_auth_enabled
 
 STATIC_DIR = Path(__file__).parent / "static"
 UI_DIR = STATIC_DIR / "ui"
@@ -59,9 +61,18 @@ BUILD_ID = "2026-05-24-v2-integrated"
 
 app = FastAPI(title="KinSpan API", version="0.2.0", description="Longevity translator for families")
 
+_cors_origins = [
+    o.strip()
+    for o in os.getenv(
+        "ALLOWED_ORIGINS",
+        "http://localhost:5173,http://127.0.0.1:5173",
+    ).split(",")
+    if o.strip()
+]
+
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://localhost:5173", "http://127.0.0.1:5173"],
+    allow_origins=_cors_origins,
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -81,6 +92,7 @@ class NoCacheMiddleware(BaseHTTPMiddleware):
 
 
 app.add_middleware(NoCacheMiddleware)
+app.add_middleware(ShareAuthMiddleware)
 
 
 @app.on_event("startup")
@@ -232,6 +244,7 @@ async def health() -> dict[str, str]:
         "ui_v2_preview": "/v2/",
         "cv_backend": cv_backend,
         "build": BUILD_ID,
+        "share_auth": share_auth_enabled(),
     }
 
 

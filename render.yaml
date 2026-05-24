@@ -1,0 +1,25 @@
+# Private shareable demo — connect this repo in Render (repo stays private on GitHub).
+# Docs: DEPLOY.md
+services:
+  - type: web
+    name: longevitree-demo
+    runtime: python
+    rootDir: server
+    plan: free
+    buildCommand: pip install -r requirements.txt
+    startCommand: uvicorn main:app --host 0.0.0.0 --port $PORT
+    healthCheckPath: /api/health
+    envVars:
+      - key: PYTHON_VERSION
+        value: "3.12.7"
+      - key: PARENT_PACE_DATA_DIR
+        value: /var/data
+      # Set in Render dashboard (never commit real values):
+      - key: SHARE_USER
+        sync: false
+      - key: SHARE_PASSWORD
+        sync: false
+    disk:
+      name: longevitree-data
+      mountPath: /var/data
+      sizeGB: 1
