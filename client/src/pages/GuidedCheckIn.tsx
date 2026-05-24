@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { Link } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
 import WorkflowNav from "../components/WorkflowNav";
 import WorkflowStepper from "../components/WorkflowStepper";
 import { getPath, setPath, type AssessmentPath } from "../path";
@@ -22,6 +22,7 @@ import WalkTest from "./WalkTest";
 const STEP_KEY = "kinspan_workflow_step";
 
 export default function GuidedCheckIn() {
+  const navigate = useNavigate();
   const path = getPath();
   const steps = useMemo(() => getWorkflow(path), [path]);
   const [stepIndex, setStepIndex] = useState(() => {
@@ -52,7 +53,10 @@ export default function GuidedCheckIn() {
 
   const goBack = () => setStepIndex((i) => Math.max(0, i - 1));
   const goNext = () => {
-    if (stepIndex >= steps.length - 1) return;
+    if (stepIndex >= steps.length - 1) {
+      navigate("/");
+      return;
+    }
     setStepIndex((i) => i + 1);
   };
 

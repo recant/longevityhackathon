@@ -391,7 +391,10 @@
   </div>
   <div class="guided-body">
     <iframe id="guidedFrame" title="KinSpan guided check-in" src="about:blank"></iframe>
-    <button type="button" class="ss-btn undo guided-back" onclick="goTo('tests')">← Return to tests</button>
+    <div class="guided-actions">
+      <button type="button" class="ss-btn finish guided-finish" onclick="finishGuidedCheckin()">Finish check-in</button>
+      <button type="button" class="ss-btn undo guided-back" onclick="goTo('tests')">← Return to tests</button>
+    </div>
   </div>
 </div>
 

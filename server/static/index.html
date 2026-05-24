@@ -107,22 +107,27 @@
     .workflow-hint { text-align: center; font-size: 0.88rem; color: var(--muted); margin: 0.5rem 0 0; }
     #tabs { display: none; }
     body.embed .embed-hide { display: none !important; }
-    body.embed .wrap { max-width: 100%; padding-top: 0.5rem; }
+    body.embed .wrap { max-width: 100%; padding: 0.5rem 0.75rem 0.25rem; }
     body.embed h1 { font-size: 1.25rem; }
+    body.embed .workflow-nav {
+      position: sticky; bottom: 0; z-index: 10;
+      background: var(--bg); margin-top: 0.75rem; padding: 0.75rem 0 0.5rem;
+      box-shadow: 0 -6px 16px rgba(47, 58, 61, 0.08);
+    }
   </style>
 </head>
 <body>
   <div class="wrap">
-    <h1>KinSpan</h1>
-    <p class="tag">Guided check-in · <span id="apiStatus">checking API…</span></p>
+    <h1 class="embed-hide">KinSpan</h1>
+    <p class="tag embed-hide">Guided check-in · <span id="apiStatus">checking API…</span></p>
     <p class="hint embed-hide" style="background:var(--primary-soft);padding:0.5rem 0.75rem;border-radius:8px">
       <a href="/" target="_top" style="color:var(--secondary);font-weight:700">← Back to home screen</a>
       · <a href="/classic" style="color:var(--secondary);font-weight:700">Open classic in full page</a>
     </p>
     <div class="notice embed-hide">Wellness trends only — not medical diagnosis. Run <code>server/start.ps1</code> (port 8003).</div>
 
-    <h2 style="font-size:1rem;margin:0.75rem 0 0.35rem">Choose assessment path</h2>
-    <div class="path-cards">
+    <h2 class="embed-hide" style="font-size:1rem;margin:0.75rem 0 0.35rem">Choose assessment path</h2>
+    <div class="path-cards embed-hide">
       <button type="button" class="path-card selected" id="pickManual">
         <strong>At-home tests</strong>
         <span>Timer, tap reaction, chair counter — no video.</span>
@@ -279,10 +284,29 @@
     function notifyParent(event) {
       try {
         if (window.parent !== window) {
-          window.parent.postMessage({ type: "kinspan:" + event }, location.origin);
+          window.parent.postMessage({ type: "kinspan:" + event }, "*");
         }
       } catch (_) { /* cross-origin guard */ }
     }
+
+    function finishWorkflow() {
+      if (IS_EMBED) {
+        try {
+          if (typeof window.parent.finishGuidedCheckin === "function") {
+            window.parent.finishGuidedCheckin();
+            return;
+          }
+          if (typeof window.parent.goTo === "function") {
+            window.parent.goTo("tests");
+            return;
+          }
+        } catch (_) { /* blocked */ }
+        notifyParent("workflow-finished");
+        return;
+      }
+      window.location.href = "/";
+    }
+    window.finishWorkflow = finishWorkflow;
 
     // Guided workflow (two paths)
     const MANUAL_WORKFLOW = [
@@ -453,7 +477,12 @@
     };
     document.getElementById("wfContinue").onclick = () => {
       const steps = getWorkflow();
-      if (stepIndex < steps.length - 1) { stepIndex++; showWorkflowStep(); }
+      if (stepIndex < steps.length - 1) {
+        stepIndex++;
+        showWorkflowStep();
+      } else {
+        finishWorkflow();
+      }
     };
     applyPath();
 
@@ -903,14 +932,18 @@
       document.getElementById("chairStop").disabled = true;
       document.getElementById("saveChair").disabled = false;
     };
-    document.getElementById("chairReset").onclick = () => {
-      chairState = "idle"; chairAccum = 0; chairElapsed = null;
+    function resetChairUi() {
+      chairState = "idle";
+      chairAccum = 0;
+      chairElapsed = null;
       if (chairTick) clearInterval(chairTick);
+      chairTick = null;
       document.getElementById("chairTimer").textContent = "—";
       document.getElementById("chairStop").disabled = true;
       document.getElementById("saveChair").disabled = true;
       document.getElementById("chairOut").style.display = "none";
-    };
+    }
+    document.getElementById("chairReset").onclick = resetChairUi;
     document.getElementById("saveChair").onclick = async () => {
       const out = document.getElementById("chairOut");
       const t = chairElapsed || chairSeconds();

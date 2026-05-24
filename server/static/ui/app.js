@@ -298,10 +298,14 @@ function resetChairUi() {
   chairElapsed = null;
   if (chairTick) clearInterval(chairTick);
   chairTick = null;
-  document.getElementById("chairTimer").textContent = "—";
-  document.getElementById("chairStop").disabled = true;
-  document.getElementById("saveChair").disabled = true;
-  document.getElementById("chairOut").style.display = "none";
+  const timer = document.getElementById("chairTimer");
+  if (timer) timer.textContent = "—";
+  const stop = document.getElementById("chairStop");
+  const save = document.getElementById("saveChair");
+  if (stop) stop.disabled = true;
+  if (save) save.disabled = true;
+  const out = document.getElementById("chairOut");
+  if (out) out.style.display = "none";
 }
 document.getElementById("chairReset").onclick = resetChairUi;
 document.getElementById("saveChair").onclick = async () => {
@@ -434,6 +438,24 @@ document.getElementById("taskModal")?.addEventListener("click", (e) => {
   if (e.target.id === "taskModal") closeTaskModal();
 });
 
+async function finishGuidedCheckin() {
+  try {
+    await afterAssessmentSaved();
+  } catch (_) {
+    /* refresh optional */
+  }
+  show("journals");
+}
+
+function isKinspanMessageEvent(e) {
+  if (!e?.data?.type || !String(e.data.type).startsWith("kinspan:")) return false;
+  try {
+    return new URL(e.origin).host === location.host;
+  } catch {
+    return false;
+  }
+}
+
 async function init() {
   const profile = await loadProfile();
   await loadSnapshot();
@@ -443,9 +465,12 @@ async function init() {
   else show("welcome");
 }
 
+window.finishGuidedCheckin = finishGuidedCheckin;
+
 window.addEventListener("message", (e) => {
-  if (e.origin !== location.origin) return;
-  if (e.data?.type === "kinspan:assessment-saved") afterAssessmentSaved();
+  if (!isKinspanMessageEvent(e)) return;
+  if (e.data.type === "kinspan:assessment-saved") afterAssessmentSaved().catch(() => {});
+  if (e.data.type === "kinspan:workflow-finished") finishGuidedCheckin();
 });
 
 apiGet("/api/health")

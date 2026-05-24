@@ -156,6 +156,24 @@ async function afterAssessmentSaved() {
   if (currentScreen === "graphs") renderGraphs(true);
 }
 
+async function finishGuidedCheckin() {
+  try {
+    await afterAssessmentSaved();
+  } catch (_) {
+    /* refresh optional */
+  }
+  goTo("tests");
+}
+
+function isKinspanMessageEvent(e) {
+  if (!e?.data?.type || !String(e.data.type).startsWith("kinspan:")) return false;
+  try {
+    return new URL(e.origin).host === location.host;
+  } catch {
+    return false;
+  }
+}
+
 // ---- Navigation ----
 function goTo(id) {
   document.querySelectorAll(".screen").forEach((s) => s.classList.remove("active"));
@@ -581,8 +599,13 @@ function resetChairRiseUi() {
   crAccum = 0;
   crElapsed = null;
   if (crTick) clearInterval(crTick);
+  crTick = null;
   const t = document.getElementById("crTimer");
   if (t) t.textContent = "—";
+  const stop = document.getElementById("crStop");
+  const save = document.getElementById("saveChairRise");
+  if (stop) stop.disabled = true;
+  if (save) save.disabled = true;
   document.getElementById("crOut")?.classList.remove("show");
 }
 
@@ -1025,12 +1048,14 @@ async function init() {
 }
 
 window.addEventListener("message", (e) => {
-  if (e.origin !== location.origin) return;
-  if (e.data?.type === "kinspan:assessment-saved") afterAssessmentSaved();
+  if (!isKinspanMessageEvent(e)) return;
+  if (e.data.type === "kinspan:assessment-saved") afterAssessmentSaved().catch(() => {});
+  if (e.data.type === "kinspan:workflow-finished") finishGuidedCheckin();
 });
 
 // Expose for inline handlers in HTML
 window.goTo = goTo;
+window.finishGuidedCheckin = finishGuidedCheckin;
 window.goSlide = goSlide;
 window.obNext = obNext;
 window.skipOnboarding = skipOnboarding;
