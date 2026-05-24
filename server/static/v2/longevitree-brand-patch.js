@@ -19,8 +19,45 @@
       .join("We'll start with the Quick Stand test. Grab a chair — it takes under a minute");
   }
 
+  function installQuickStandGridStyles() {
+    if (document.getElementById('longevitreeGridPatchStyles')) return;
+    const style = document.createElement('style');
+    style.id = 'longevitreeGridPatchStyles';
+    style.textContent = `
+      #tests .test-tiles{grid-template-columns:1fr 1fr!important;align-items:stretch!important}
+      #tests .test-tile{min-height:104px!important;height:104px!important;display:flex!important;flex-direction:column!important}
+      #tests .test-tile.t-sage{grid-column:auto!important}
+      #tests .ttile-hdr{height:46px!important;min-height:46px!important;max-height:46px!important}
+      #tests .ttile-body{flex:1!important;min-height:58px!important;display:flex!important;align-items:center!important}
+    `;
+    document.head.appendChild(style);
+  }
+
+  function forceFullCheckinOnBoot() {
+    if (window.__longevitreeForcedFullCheckin) return;
+    window.__longevitreeForcedFullCheckin = true;
+    try {
+      sessionStorage.setItem('kinspan_v2_skip_onboarding', '1');
+    } catch (_) {}
+    const open = () => {
+      try {
+        if (typeof window.goTo === 'function') {
+          window.goTo('guided');
+          const frame = document.getElementById('guidedFrame');
+          if (frame && !String(frame.getAttribute('src') || '').includes('/classic')) {
+            frame.src = '/classic?embed=1';
+          }
+        }
+      } catch (_) {}
+    };
+    setTimeout(open, 150);
+    setTimeout(open, 600);
+    setTimeout(open, 1200);
+  }
+
   function applyBranding() {
     try {
+      installQuickStandGridStyles();
       document.title = replaceBrandText(document.title);
       const root = document.body || document.documentElement;
       if (!root) return;
@@ -68,6 +105,7 @@
       });
       if (quickTile) {
         quickTile.setAttribute('onclick', "goTo('chair-rise')");
+        quickTile.style.gridColumn = 'auto';
         const hdr = quickTile.querySelector('.ttile-hdr');
         const body = quickTile.querySelector('.ttile-body');
         if (hdr) hdr.textContent = 'Quick Stand ›';
@@ -103,7 +141,7 @@
         const isFinal = btn && /Start first test/i.test(btn.textContent || '');
         if (isFinal && typeof window.goTo === 'function') {
           sessionStorage.setItem('kinspan_v2_skip_onboarding', '1');
-          window.goTo('chair-rise');
+          window.goTo('guided');
           return;
         }
         return originalObNext.apply(this, arguments);
@@ -113,21 +151,28 @@
 
   window.longevitreeApplyBranding = applyBranding;
   document.addEventListener('DOMContentLoaded', () => {
+    installQuickStandGridStyles();
     patchNavigation();
     applyBranding();
+    forceFullCheckinOnBoot();
   });
   window.addEventListener('focus', () => {
+    installQuickStandGridStyles();
     patchNavigation();
     applyBranding();
   });
   document.addEventListener('click', () => setTimeout(() => {
+    installQuickStandGridStyles();
     patchNavigation();
     applyBranding();
   }, 50));
   setInterval(() => {
+    installQuickStandGridStyles();
     patchNavigation();
     applyBranding();
   }, 1000);
+  installQuickStandGridStyles();
   patchNavigation();
   applyBranding();
+  forceFullCheckinOnBoot();
 })();
