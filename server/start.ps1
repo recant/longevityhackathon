@@ -1,4 +1,7 @@
 # KinSpan — always use this script so you get the latest code (not a stale port).
+param(
+  [switch]$Fresh  # Wipe kinspan.db once (demo only). Omit to keep existing profiles.
+)
 $ErrorActionPreference = "Stop"
 Set-Location $PSScriptRoot
 
@@ -9,11 +12,14 @@ foreach ($p in 8000, 8001, 8002, 8003) {
 }
 Start-Sleep -Seconds 1
 
-if ($env:KINSPAN_DEMO_FRESH -eq "1") {
+if ($Fresh -or $env:KINSPAN_DEMO_FRESH -eq "1") {
   $db = Join-Path $PSScriptRoot "data\kinspan.db"
   if (Test-Path $db) {
     Remove-Item $db -Force
     Write-Host "Demo: cleared $db (no seeded profiles)" -ForegroundColor Yellow
+  }
+  if ($env:KINSPAN_DEMO_FRESH -eq "1" -and -not $Fresh) {
+    Write-Host "Tip: unset KINSPAN_DEMO_FRESH to keep profiles between restarts." -ForegroundColor DarkYellow
   }
 }
 

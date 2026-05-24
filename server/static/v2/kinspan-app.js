@@ -12,6 +12,7 @@ let snapshot = null;
 let profile = null;
 let profiles = [];
 let history = null;
+let treatmentTracker = null;
 let profileEditingId = null;
 let profileCreateMode = false;
 let currentScreen = "onboarding";
@@ -123,13 +124,26 @@ async function loadProfiles() {
 }
 
 async function loadProfile() {
-  if (!activeProfileId() && !profiles.length) {
+  if (!profiles.length) {
     profile = null;
     parentName = "Parent";
     applyNames();
     return null;
   }
-  profile = await apiGet("/api/profile");
+  const stored = activeProfileId();
+  const match = profiles.find((p) => String(p.id) === String(stored));
+  if (!match) setActiveProfileId(profiles[0].id);
+  try {
+    profile = await apiGet("/api/profile");
+  } catch (e) {
+    const msg = apiErrorMessage(e.message || "");
+    if (msg.includes("No parent profile") || msg.includes("Profile not found")) {
+      setActiveProfileId(profiles[0].id);
+      profile = await apiGet("/api/profile");
+    } else {
+      throw e;
+    }
+  }
   parentName = profile.display_name || "Parent";
   if (profile.id) setActiveProfileId(profile.id);
   applyNames();
@@ -149,11 +163,15 @@ async function loadHistory() {
 async function afterAssessmentSaved() {
   await loadSnapshot();
   await loadHistory();
+  await loadTreatmentTracker().catch(() => {
+    treatmentTracker = null;
+  });
   if (currentScreen === "dashboard") renderDashboard();
   if (["journal-select", "tests"].includes(currentScreen)) renderJournals();
   if (currentScreen === "weekly-digest") renderDigest();
   if (currentScreen === "doctor-export") renderDoctorExport();
   if (currentScreen === "graphs") renderGraphs(true);
+  if (currentScreen === "treatment") renderTreatmentTracker();
 }
 
 async function finishGuidedCheckin() {
@@ -202,6 +220,7 @@ function goTo(id) {
   if (id === "weekly-digest") renderDigest();
   if (id === "doctor-export") renderDoctorExport();
   if (id === "graphs") renderGraphs();
+  if (id === "treatment") renderTreatmentTracker();
   if (id === "walk") resetWalkUi();
   if (id === "chair-rise") resetChairRiseUi();
   if (id === "reaction") resetReactionUi();
@@ -239,8 +258,20 @@ function obNext() {
   else finishOnboarding();
 }
 
-function finishOnboarding() {
+function hasCompletedOnboarding() {
+  return (
+    localStorage.getItem(SKIP_ONBOARDING_KEY) === "1" ||
+    sessionStorage.getItem(SKIP_ONBOARDING_KEY) === "1"
+  );
+}
+
+function markOnboardingComplete() {
+  localStorage.setItem(SKIP_ONBOARDING_KEY, "1");
   sessionStorage.setItem(SKIP_ONBOARDING_KEY, "1");
+}
+
+function finishOnboarding() {
+  markOnboardingComplete();
   routeAfterAuth();
 }
 
@@ -249,9 +280,13 @@ function routeAfterAuth() {
     profileCreateMode = true;
     profileEditingId = null;
     goTo("journal-select");
-  } else {
-    goTo("dashboard");
+    return;
   }
+  markOnboardingComplete();
+  const stored = activeProfileId();
+  const match = profiles.find((p) => String(p.id) === String(stored));
+  if (!match) setActiveProfileId(profiles[0].id);
+  goTo("dashboard");
 }
 
 function skipOnboarding() {
@@ -278,11 +313,15 @@ function renderJournals() {
   if (!area) return;
 
   if (!profiles.length) {
+    const resetHint = hasCompletedOnboarding()
+      ? `<p class="journal-reset-hint">No profiles found on this device. If you restarted the demo server with a fresh database, create your parent profile again — your check-in history may have been cleared.</p>`
+      : "";
     area.innerHTML = `
       <div class="journal-card journal-card--solo" data-add-parent>
         <div class="journal-avatar journal-avatar--add">+</div>
         <h3>Add your first parent</h3>
         <div class="j-updated">Name, age, and sex for fair comparisons</div>
+        ${resetHint}
         <button type="button" class="go-btn">Create profile →</button>
       </div>`;
     area.querySelector("[data-add-parent]")?.addEventListener("click", (e) => {
@@ -329,9 +368,13 @@ function renderJournals() {
       try {
         await loadSnapshot();
         await loadHistory();
+        await loadTreatmentTracker().catch(() => {
+          treatmentTracker = null;
+        });
       } catch {
         snapshot = null;
         history = null;
+        treatmentTracker = null;
       }
       goTo("dashboard");
     });
@@ -410,16 +453,42 @@ function renderDashboard() {
   }
 
   if (taskList) {
-    const actions = snapshot?.actions || [];
-    if (!actions.length) {
-      taskList.innerHTML = "<li>Complete a check-in to see your action plan.</li>";
+    const pill = document.getElementById("taskStreakPill");
+    if (treatmentTracker?.summary) {
+      const s = treatmentTracker.summary;
+      if (pill) {
+        pill.textContent = `${s.done_today}/${s.due_today} today · ${s.week_pct}% this week`;
+      }
+      const preview = (treatmentTracker.groups || [])
+        .flatMap((g) => g.items)
+        .slice(0, 4);
+      if (preview.length) {
+        taskList.innerHTML = preview
+          .map(
+            (item) =>
+              `<li class="task-item-static ${item.done ? "done-preview" : ""}"><strong>${escapeHtml(item.label)}</strong>` +
+              `<p class="task-sub">${escapeHtml(item.cadence)}${item.done ? " · done" : ""}</p></li>`
+          )
+          .join("");
+      } else {
+        taskList.innerHTML = "<li>Loading your plan…</li>";
+      }
     } else {
-      taskList.innerHTML = actions
-        .map(
-          (a) =>
-            `<li class="task-item-static"><strong>${escapeHtml(a.title)}</strong><p class="task-sub">${escapeHtml(a.detail)}</p></li>`
-        )
-        .join("");
+      loadTreatmentTracker()
+        .then(() => renderDashboard())
+        .catch(() => {
+          const actions = snapshot?.actions || [];
+          if (!actions.length) {
+            taskList.innerHTML = "<li>Complete a check-in to see your action plan.</li>";
+          } else {
+            taskList.innerHTML = actions
+              .map(
+                (a) =>
+                  `<li class="task-item-static"><strong>${escapeHtml(a.title)}</strong><p class="task-sub">${escapeHtml(a.detail)}</p></li>`
+              )
+              .join("");
+          }
+        });
     }
   }
 
@@ -473,6 +542,103 @@ function updateNavForScreen(id) {
   document.querySelectorAll(".nav-bar .nav-item").forEach((n) => {
     n.classList.toggle("active", n.dataset.nav === id);
   });
+}
+
+// ---- Treatment tracker ----
+async function loadTreatmentTracker() {
+  treatmentTracker = await apiGet("/api/treatment-tracker");
+  return treatmentTracker;
+}
+
+function trackerCheckSvg() {
+  return '<svg width="11" height="11" viewBox="0 0 12 12" fill="none"><polyline points="2,6 5,9 10,3" stroke="white" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>';
+}
+
+function renderTreatmentTracker() {
+  const groupsEl = document.getElementById("trackerGroups");
+  const todayEl = document.getElementById("trackerToday");
+  const weekEl = document.getElementById("trackerWeek");
+  if (!groupsEl) return;
+
+  const paint = () => {
+    const s = treatmentTracker?.summary || {};
+    if (todayEl) todayEl.textContent = `${s.done_today ?? 0}/${s.due_today ?? 0}`;
+    if (weekEl) weekEl.textContent = `${s.week_pct ?? 0}%`;
+    const groups = treatmentTracker?.groups || [];
+    if (!groups.length) {
+      groupsEl.innerHTML =
+        '<p class="tracker-empty">Complete a check-in first — we will build a personalized habit list from scores.</p>';
+      return;
+    }
+    groupsEl.innerHTML = groups
+      .map((g) => {
+        const items = (g.items || [])
+          .map((item) => {
+            const done = !!item.done;
+            const auto = item.auto ? ' <span class="tracker-auto">from test</span>' : "";
+            const testBtn = item.test_route
+              ? `<button type="button" class="tracker-test-link" data-route="${escapeHtml(item.test_route)}">Run test →</button>`
+              : "";
+            return (
+              `<div class="tracker-item ${done ? "done" : ""}" data-id="${escapeHtml(item.id)}" data-period="${escapeHtml(item.period)}" role="button" tabindex="0">` +
+              `<div class="task-check ${done ? "done" : ""}">${done ? trackerCheckSvg() : ""}</div>` +
+              `<div class="tracker-item-body">` +
+              `<div class="tracker-item-title">${escapeHtml(item.label)}${auto}</div>` +
+              `<div class="tracker-item-meta">${escapeHtml(item.cadence)}${item.citation ? " · " + escapeHtml(item.citation) : ""}</div>` +
+              (item.detail ? `<p class="tracker-item-detail">${escapeHtml(item.detail)}</p>` : "") +
+              testBtn +
+              `</div></div>`
+            );
+          })
+          .join("");
+        return (
+          `<section class="tracker-section"><h3 class="tracker-section-title">${escapeHtml(g.title)}</h3>` +
+          `<p class="tracker-section-sub">${escapeHtml(g.subtitle)}</p>${items}</section>`
+        );
+      })
+      .join("");
+
+    groupsEl.querySelectorAll(".tracker-item").forEach((row) => {
+      row.addEventListener("click", (e) => {
+        if (e.target.closest(".tracker-test-link")) return;
+        toggleTreatmentItem(row.dataset.id, row.dataset.period);
+      });
+    });
+    groupsEl.querySelectorAll(".tracker-test-link").forEach((btn) => {
+      btn.addEventListener("click", (e) => {
+        e.stopPropagation();
+        goTo(btn.dataset.route);
+      });
+    });
+  };
+
+  if (treatmentTracker) {
+    paint();
+    return;
+  }
+  groupsEl.innerHTML = '<p class="tracker-empty">Loading…</p>';
+  loadTreatmentTracker()
+    .then(paint)
+    .catch((e) => {
+      groupsEl.innerHTML = `<p class="tracker-empty err">${escapeHtml(apiErrorMessage(e.message))}</p>`;
+    });
+}
+
+async function toggleTreatmentItem(itemId, period) {
+  if (!itemId) return;
+  const item = (treatmentTracker?.items || []).find((i) => i.id === itemId);
+  const nextDone = !(item && item.done);
+  try {
+    treatmentTracker = await apiPost("/api/treatment-tracker/toggle", {
+      item_id: itemId,
+      period: period || undefined,
+      done: nextDone,
+    });
+    renderTreatmentTracker();
+    if (currentScreen === "dashboard") renderDashboard();
+  } catch (e) {
+    t("toastTreatment", apiErrorMessage(e.message));
+  }
 }
 
 // ---- Tasks / milestone ----
@@ -836,6 +1002,7 @@ function setupProfile() {
         snapshot = null;
         history = null;
       }
+      markOnboardingComplete();
       renderJournals();
       setTimeout(() => goTo("dashboard"), 600);
     } catch (e) {
@@ -1022,9 +1189,13 @@ async function init() {
       try {
         await loadSnapshot();
         await loadHistory();
+        await loadTreatmentTracker().catch(() => {
+          treatmentTracker = null;
+        });
       } catch {
         snapshot = null;
         history = null;
+        treatmentTracker = null;
       }
     }
     renderJournals();
@@ -1033,7 +1204,7 @@ async function init() {
     t("toastDash", "API offline — start server on port 8003");
   }
 
-  if (sessionStorage.getItem(SKIP_ONBOARDING_KEY) === "1") {
+  if (profiles.length > 0 || hasCompletedOnboarding()) {
     routeAfterAuth();
   } else {
     goTo("onboarding");

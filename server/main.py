@@ -32,14 +32,17 @@ from database import (
     create_profile,
     get_default_profile,
     get_profile_by_id,
+    get_treatment_state,
     init_db,
     list_all_sessions,
     list_profiles,
     save_chair,
     save_gait,
     save_reaction,
+    save_treatment_toggle,
     update_profile,
 )
+from treatment_tracker import build_treatment_items, build_tracker_response, period_for
 from insights import generate_insights
 from interventions import generate_interventions
 from scoring import (
@@ -145,6 +148,12 @@ class ChairBody(BaseModel):
 
 class ChairRepsBody(BaseModel):
     reps: int = Field(..., ge=0, le=50)
+
+
+class TreatmentToggleBody(BaseModel):
+    item_id: str = Field(..., min_length=1, max_length=80)
+    period: str | None = None
+    done: bool = True
 
 
 def _profile_age_sex(profile: dict[str, Any]) -> tuple[int, str | None]:
@@ -394,6 +403,49 @@ async def snapshot(profile_id: int | None = Query(None)) -> dict[str, Any]:
 async def history(profile_id: int | None = Query(None)) -> dict:
     prof = await _require_profile(profile_id)
     return await list_all_sessions(prof["id"])
+
+
+@app.get("/api/treatment-tracker")
+async def treatment_tracker(profile_id: int | None = Query(None)) -> dict[str, Any]:
+    prof = await _require_profile(profile_id)
+    history = await list_all_sessions(prof["id"])
+    snap = _build_snapshot(prof, history)
+    items = build_treatment_items(
+        snap.get("categories") or [],
+        prof,
+        actions=snap.get("actions"),
+    )
+    state = await get_treatment_state(prof["id"])
+    payload = build_tracker_response(items, state, history)
+    payload["profile"] = {
+        "id": prof["id"],
+        "display_name": prof.get("display_name"),
+    }
+    return payload
+
+
+@app.post("/api/treatment-tracker/toggle")
+async def treatment_tracker_toggle(
+    body: TreatmentToggleBody,
+    profile_id: int | None = Query(None),
+) -> dict[str, Any]:
+    prof = await _require_profile(profile_id)
+    history = await list_all_sessions(prof["id"])
+    snap = _build_snapshot(prof, history)
+    items = build_treatment_items(
+        snap.get("categories") or [],
+        prof,
+        actions=snap.get("actions"),
+    )
+    item = next((i for i in items if i["id"] == body.item_id), None)
+    if not item:
+        raise HTTPException(404, "Checklist item not found")
+    period = body.period or period_for(item["cadence_key"])
+    await save_treatment_toggle(prof["id"], body.item_id, period, body.done)
+    state = await get_treatment_state(prof["id"])
+    payload = build_tracker_response(items, state, history)
+    payload["profile"] = {"id": prof["id"], "display_name": prof.get("display_name")}
+    return payload
 
 
 def _save_upload(video: UploadFile) -> Path:

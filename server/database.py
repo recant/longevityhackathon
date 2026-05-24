@@ -99,6 +99,15 @@ async def init_db() -> None:
             """
         )
         await _migrate_session_mode(db)
+        await db.execute(
+            """
+            CREATE TABLE IF NOT EXISTS treatment_tracker (
+                profile_id INTEGER PRIMARY KEY,
+                state_json TEXT NOT NULL DEFAULT '{}',
+                updated_at TEXT NOT NULL
+            )
+            """
+        )
         await db.commit()
 
 
@@ -155,7 +164,7 @@ async def update_profile(profile_id: int, data: dict[str, Any]) -> dict[str, Any
             sets.append(f"{key} = ?")
             vals.append(data[key])
     if not sets:
-        return await get_default_profile()
+        return await get_profile_by_id(profile_id)
     vals.append(profile_id)
     async with aiosqlite.connect(DB_PATH) as db:
         await db.execute(
@@ -163,7 +172,7 @@ async def update_profile(profile_id: int, data: dict[str, Any]) -> dict[str, Any
             vals,
         )
         await db.commit()
-    return await get_default_profile()
+    return await get_profile_by_id(profile_id)
 
 
 async def save_reaction(
@@ -289,6 +298,62 @@ async def list_all_sessions(profile_id: int, limit: int = 24) -> dict[str, Any]:
             "gaits": await gaits(),
             "chairs": await chairs(),
         }
+
+
+async def get_treatment_state(profile_id: int) -> dict[str, Any]:
+    async with aiosqlite.connect(DB_PATH) as db:
+        db.row_factory = aiosqlite.Row
+        cur = await db.execute(
+            "SELECT state_json FROM treatment_tracker WHERE profile_id = ?",
+            (profile_id,),
+        )
+        row = await cur.fetchone()
+        if not row:
+            return {"completions": {}}
+        try:
+            data = json.loads(row["state_json"])
+        except json.JSONDecodeError:
+            return {"completions": {}}
+        if not isinstance(data, dict):
+            return {"completions": {}}
+        completions = data.get("completions")
+        if not isinstance(completions, dict):
+            return {"completions": {}}
+        return {"completions": completions}
+
+
+async def save_treatment_toggle(
+    profile_id: int,
+    item_id: str,
+    period: str,
+    done: bool,
+) -> dict[str, Any]:
+    state = await get_treatment_state(profile_id)
+    completions: dict[str, list[str]] = state.setdefault("completions", {})
+    periods = list(completions.get(item_id, []))
+    if done:
+        if period not in periods:
+            periods.append(period)
+    else:
+        periods = [p for p in periods if p != period]
+    if periods:
+        completions[item_id] = periods
+    elif item_id in completions:
+        del completions[item_id]
+    updated = _utc_now()
+    async with aiosqlite.connect(DB_PATH) as db:
+        await db.execute(
+            """
+            INSERT INTO treatment_tracker (profile_id, state_json, updated_at)
+            VALUES (?, ?, ?)
+            ON CONFLICT(profile_id) DO UPDATE SET
+                state_json = excluded.state_json,
+                updated_at = excluded.updated_at
+            """,
+            (profile_id, json.dumps({"completions": completions}), updated),
+        )
+        await db.commit()
+    return {"completions": completions}
 
 
 async def clear_assessment_data() -> dict[str, int]:

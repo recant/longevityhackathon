@@ -542,7 +542,7 @@ def default_actions(categories: list[dict[str, Any]]) -> list[dict[str, str]]:
 TRACKING_CHECKLIST = [
     {"id": "reaction", "label": "Reaction speed", "cadence": "Monthly", "biomarker": True},
     {"id": "gait", "label": "10-foot walk pace", "cadence": "Monthly", "biomarker": True},
-    {"id": "chair", "label": "30-second chair stand (STEADI)", "cadence": "Monthly", "biomarker": True},
+    {"id": "chair", "label": "Sit & stand timing", "cadence": "Monthly", "biomarker": True},
     {"id": "sleep", "label": "Sleep quality (questions)", "cadence": "Weekly", "biomarker": False},
     {"id": "balance", "label": "One-foot balance (10 sec)", "cadence": "Monthly", "biomarker": False},
     {"id": "social", "label": "Social outings & hobbies", "cadence": "Weekly", "biomarker": False},

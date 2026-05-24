@@ -115,9 +115,9 @@
         <div class="tile-icon"><svg width="19" height="19" viewBox="0 0 20 20" fill="none"><circle cx="10" cy="10" r="8" stroke="white" stroke-width="1.5"/><line x1="10" y1="6" x2="10" y2="14" stroke="white" stroke-width="1.5" stroke-linecap="round"/><line x1="6" y1="10" x2="14" y2="10" stroke="white" stroke-width="1.5" stroke-linecap="round"/></svg></div>
         <span>New Test</span>
       </button>
-      <button class="tile green" onclick="openTasks()">
+      <button class="tile green" onclick="goTo('treatment')">
         <div class="tile-icon"><svg width="19" height="19" viewBox="0 0 20 20" fill="none"><polyline points="4,10 8,14 16,6" stroke="white" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg></div>
-        <span>View Tasks</span>
+        <span>Treatment plan</span>
       </button>
       <button class="tile terra" onclick="goTo('graphs')">
         <div class="tile-icon"><svg width="19" height="19" viewBox="0 0 20 20" fill="none"><rect x="3" y="11" width="3" height="6" rx="1" fill="white"/><rect x="8.5" y="7" width="3" height="10" rx="1" fill="white"/><rect x="14" y="4" width="3" height="13" rx="1" fill="white"/></svg></div>
@@ -158,9 +158,10 @@
   <div class="tasks-overlay" id="tasksOverlay" onclick="closeTasks()">
     <div class="tasks-sheet" id="tasksSheet" onclick="event.stopPropagation()">
       <div class="sheet-handle"></div>
-      <h2>Action plan</h2>
-      <div class="streak-pill">Evidence-based habits from your check-ins</div>
+      <h2>Quick preview</h2>
+      <div class="streak-pill" id="taskStreakPill">Treatment & tracking</div>
       <ul id="taskList" class="task-list-api"></ul>
+      <button type="button" class="sm-btn tracker-open-full" onclick="closeTasks();goTo('treatment')">Open full tracker →</button>
     </div>
   </div>
 
@@ -183,6 +184,29 @@
     <button class="nav-item" data-nav="graphs" onclick="goTo('graphs')"><svg width="19" height="19" viewBox="0 0 22 22" fill="none"><polyline points="3,16 8,10 12,13 19,6" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg><span>Progress</span></button>
   </div>
   <div class="toast" id="toastDash"></div>
+</div>
+
+<!-- TREATMENT TRACKER -->
+<div class="screen" id="treatment">
+  <div class="screen-scroll-pad">
+    <div class="digest-header">
+      <button class="back-btn" onclick="goTo('dashboard')">← Back</button>
+      <h2>Treatment &amp; tracking</h2>
+      <p id="trackerSub">Habits and check-ins for <span data-parent-name>your parent</span></p>
+    </div>
+    <div class="tracker-summary" id="trackerSummary">
+      <div class="tracker-stat"><div class="tracker-stat-val" id="trackerToday">0/0</div><div class="tracker-stat-lbl">Today</div></div>
+      <div class="tracker-stat"><div class="tracker-stat-val" id="trackerWeek">0%</div><div class="tracker-stat-lbl">This week</div></div>
+    </div>
+    <p class="tracker-hint">Not medical treatment — wellness habits and home check-ins. Tap to mark done for this period.</p>
+    <div id="trackerGroups"></div>
+  </div>
+  <div class="nav-bar">
+    <button class="nav-item active" data-nav="dashboard" onclick="goTo('dashboard')"><svg width="19" height="19" viewBox="0 0 22 22" fill="none"><rect x="3" y="3" width="7" height="7" rx="2" stroke="currentColor" stroke-width="1.5"/><rect x="12" y="3" width="7" height="7" rx="2" stroke="currentColor" stroke-width="1.5"/><rect x="3" y="12" width="7" height="7" rx="2" stroke="currentColor" stroke-width="1.5"/><rect x="12" y="12" width="7" height="7" rx="2" stroke="currentColor" stroke-width="1.5"/></svg><span>Home</span></button>
+    <button class="nav-item" data-nav="tests" onclick="goTo('tests')"><svg width="19" height="19" viewBox="0 0 22 22" fill="none"><circle cx="11" cy="11" r="8" stroke="currentColor" stroke-width="1.5"/><line x1="11" y1="7" x2="11" y2="15" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/><line x1="7" y1="11" x2="15" y2="11" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg><span>Tests</span></button>
+    <button class="nav-item" data-nav="graphs" onclick="goTo('graphs')"><svg width="19" height="19" viewBox="0 0 22 22" fill="none"><polyline points="3,16 8,10 12,13 19,6" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg><span>Progress</span></button>
+  </div>
+  <div class="toast" id="toastTreatment"></div>
 </div>
 
 <!-- TESTS -->
