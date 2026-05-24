@@ -9,6 +9,14 @@ foreach ($p in 8000, 8001, 8002, 8003) {
 }
 Start-Sleep -Seconds 1
 
+if ($env:KINSPAN_DEMO_FRESH -eq "1") {
+  $db = Join-Path $PSScriptRoot "data\kinspan.db"
+  if (Test-Path $db) {
+    Remove-Item $db -Force
+    Write-Host "Demo: cleared $db (no seeded profiles)" -ForegroundColor Yellow
+  }
+}
+
 Write-Host "Starting KinSpan on http://127.0.0.1:$port (build from main.py BUILD_ID)"
 Start-Process "http://127.0.0.1:$port/"
 Start-Process "http://127.0.0.1:$port/v2/"

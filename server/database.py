@@ -100,27 +100,50 @@ async def init_db() -> None:
         )
         await _migrate_session_mode(db)
         await db.commit()
-        cur = await db.execute("SELECT COUNT(*) FROM profiles")
+
+
+async def list_profiles() -> list[dict[str, Any]]:
+    async with aiosqlite.connect(DB_PATH) as db:
+        db.row_factory = aiosqlite.Row
+        cur = await db.execute("SELECT * FROM profiles ORDER BY id ASC")
+        rows = await cur.fetchall()
+        return [dict(r) for r in rows]
+
+
+async def create_profile(
+    display_name: str,
+    age: int,
+    sex: str,
+) -> dict[str, Any]:
+    created = _utc_now()
+    async with aiosqlite.connect(DB_PATH) as db:
+        cur = await db.execute(
+            """
+            INSERT INTO profiles (display_name, age, sex, created_at)
+            VALUES (?, ?, ?, ?)
+            """,
+            (display_name, age, sex, created),
+        )
+        await db.commit()
+        pid = cur.lastrowid
+    return await get_profile_by_id(int(pid))
+
+
+async def get_profile_by_id(profile_id: int) -> dict[str, Any]:
+    async with aiosqlite.connect(DB_PATH) as db:
+        db.row_factory = aiosqlite.Row
+        cur = await db.execute("SELECT * FROM profiles WHERE id = ?", (profile_id,))
         row = await cur.fetchone()
-        if row and row[0] == 0:
-            await db.execute(
-                """
-                INSERT INTO profiles (display_name, age, sex, created_at)
-                VALUES (?, ?, ?, ?)
-                """,
-                ("Mom/Dad", 68, "female", _utc_now()),
-            )
-            await db.commit()
+        if row is None:
+            raise RuntimeError(f"Profile {profile_id} not found")
+        return dict(row)
 
 
 async def get_default_profile() -> dict[str, Any]:
-    async with aiosqlite.connect(DB_PATH) as db:
-        db.row_factory = aiosqlite.Row
-        cur = await db.execute("SELECT * FROM profiles ORDER BY id LIMIT 1")
-        row = await cur.fetchone()
-        if row is None:
-            raise RuntimeError("No profile found")
-        return dict(row)
+    profiles = await list_profiles()
+    if not profiles:
+        raise RuntimeError("No profile found")
+    return profiles[0]
 
 
 async def update_profile(profile_id: int, data: dict[str, Any]) -> dict[str, Any]:

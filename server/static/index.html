@@ -433,12 +433,18 @@
     }
 
     pickManual.onclick = () => {
-      if (currentPath !== "manual") { currentPath = "manual"; resetWorkflow(); }
-      else applyPath();
+      if (currentPath !== "manual") {
+        currentPath = "manual";
+        resetWorkflow();
+      }
+      applyPath();
     };
     pickVision.onclick = () => {
-      if (currentPath !== "vision") { currentPath = "vision"; resetWorkflow(); }
-      else applyPath();
+      if (currentPath !== "vision") {
+        currentPath = "vision";
+        resetWorkflow();
+      }
+      applyPath();
     };
     document.getElementById("workflowRestart").onclick = resetWorkflow;
     document.getElementById("wfBack").onclick = () => {

@@ -18,7 +18,7 @@ except ImportError:
     pass
 from typing import Any
 
-from fastapi import FastAPI, File, Form, HTTPException, Request, UploadFile
+from fastapi import FastAPI, File, Form, HTTPException, Query, Request, UploadFile
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse, RedirectResponse, Response
 from fastapi.staticfiles import StaticFiles
@@ -29,9 +29,12 @@ from cv_analysis import ActionMismatchError, analyze_chair_video, analyze_walk_v
 from database import (
     DATA_DIR,
     clear_assessment_data,
+    create_profile,
     get_default_profile,
+    get_profile_by_id,
     init_db,
     list_all_sessions,
+    list_profiles,
     save_chair,
     save_gait,
     save_reaction,
@@ -97,6 +100,12 @@ async def startup() -> None:
     await init_db()
 
 
+class ProfileCreate(BaseModel):
+    display_name: str = Field(..., min_length=1, max_length=80)
+    age: int = Field(..., ge=50, le=110)
+    sex: str = "female"
+
+
 class ProfileUpdate(BaseModel):
     display_name: str | None = None
     age: int | None = Field(None, ge=50, le=110)
@@ -105,6 +114,21 @@ class ProfileUpdate(BaseModel):
     medications: str | None = None
     smoking: str | None = None
     sleep_habits: str | None = None
+
+
+async def _require_profile(profile_id: int | None = None) -> dict[str, Any]:
+    if profile_id is not None:
+        try:
+            return await get_profile_by_id(profile_id)
+        except RuntimeError as e:
+            raise HTTPException(404, "Profile not found") from e
+    try:
+        return await get_default_profile()
+    except RuntimeError as e:
+        raise HTTPException(
+            404,
+            "No parent profile yet. Add one from the journal screen.",
+        ) from e
 
 
 class ReactionBody(BaseModel):
@@ -269,21 +293,37 @@ async def assessment_paths() -> dict[str, Any]:
     }
 
 
+@app.get("/api/profiles")
+async def get_profiles() -> dict[str, Any]:
+    return {"profiles": await list_profiles()}
+
+
+@app.post("/api/profiles")
+async def post_profile(body: ProfileCreate) -> dict:
+    return await create_profile(body.display_name.strip(), body.age, body.sex)
+
+
 @app.get("/api/profile")
-async def get_profile() -> dict:
-    return await get_default_profile()
+async def get_profile(profile_id: int | None = Query(None)) -> dict:
+    return await _require_profile(profile_id)
 
 
 @app.put("/api/profile")
-async def put_profile(body: ProfileUpdate) -> dict:
-    prof = await get_default_profile()
+async def put_profile(
+    body: ProfileUpdate,
+    profile_id: int | None = Query(None),
+) -> dict:
+    prof = await _require_profile(profile_id)
     data = body.model_dump(exclude_unset=True)
     return await update_profile(prof["id"], data)
 
 
 @app.post("/api/assessments/reaction")
-async def post_reaction(body: ReactionBody) -> dict:
-    prof = await get_default_profile()
+async def post_reaction(
+    body: ReactionBody,
+    profile_id: int | None = Query(None),
+) -> dict:
+    prof = await _require_profile(profile_id)
     age, sex = _profile_age_sex(prof)
     trials = sorted(body.trials_ms)
     n = len(trials)
@@ -295,8 +335,11 @@ async def post_reaction(body: ReactionBody) -> dict:
 
 
 @app.post("/api/assessments/gait")
-async def post_gait(body: GaitBody) -> dict:
-    prof = await get_default_profile()
+async def post_gait(
+    body: GaitBody,
+    profile_id: int | None = Query(None),
+) -> dict:
+    prof = await _require_profile(profile_id)
     age, sex = _profile_age_sex(prof)
     scores = score_gait(body.time_seconds, age, sex)
     session = await save_gait(prof["id"], body.time_seconds, scores)
@@ -304,8 +347,11 @@ async def post_gait(body: GaitBody) -> dict:
 
 
 @app.post("/api/assessments/chair-stand")
-async def post_chair(body: ChairBody) -> dict:
-    prof = await get_default_profile()
+async def post_chair(
+    body: ChairBody,
+    profile_id: int | None = Query(None),
+) -> dict:
+    prof = await _require_profile(profile_id)
     age, sex = _profile_age_sex(prof)
     scores = score_chair_single_stand(body.rise_time_seconds, 0.5, age, sex)
     session = await save_chair(prof["id"], 1, scores)
@@ -313,9 +359,12 @@ async def post_chair(body: ChairBody) -> dict:
 
 
 @app.post("/api/assessments/chair-reps")
-async def post_chair_reps(body: ChairRepsBody) -> dict:
+async def post_chair_reps(
+    body: ChairRepsBody,
+    profile_id: int | None = Query(None),
+) -> dict:
     """CDC STEADI 30-second chair stand — rep count scoring (Rikli norms)."""
-    prof = await get_default_profile()
+    prof = await _require_profile(profile_id)
     age, sex = _profile_age_sex(prof)
     scores = score_chair_stand(body.reps, age, sex)
     session = await save_chair(prof["id"], body.reps, scores)
@@ -323,8 +372,8 @@ async def post_chair_reps(body: ChairRepsBody) -> dict:
 
 
 @app.get("/api/snapshot")
-async def snapshot() -> dict[str, Any]:
-    prof = await get_default_profile()
+async def snapshot(profile_id: int | None = Query(None)) -> dict[str, Any]:
+    prof = await _require_profile(profile_id)
     history = await list_all_sessions(prof["id"])
     snap = _build_snapshot(prof, history)
     snap["insights"] = generate_insights(prof, snap)
@@ -332,8 +381,8 @@ async def snapshot() -> dict[str, Any]:
 
 
 @app.get("/api/history")
-async def history() -> dict:
-    prof = await get_default_profile()
+async def history(profile_id: int | None = Query(None)) -> dict:
+    prof = await _require_profile(profile_id)
     return await list_all_sessions(prof["id"])
 
 
@@ -351,8 +400,9 @@ def _save_upload(video: UploadFile) -> Path:
 async def post_cv_walk(
     video: UploadFile = File(...),
     distance_meters: float = Form(3.048),
+    profile_id: int | None = Query(None),
 ) -> dict[str, Any]:
-    prof = await get_default_profile()
+    prof = await _require_profile(profile_id)
     age, sex = _profile_age_sex(prof)
     dest = _save_upload(video)
     try:
@@ -373,8 +423,11 @@ async def post_cv_walk(
 
 
 @app.post("/api/assessments/cv/chair-stand")
-async def post_cv_chair(video: UploadFile = File(...)) -> dict[str, Any]:
-    prof = await get_default_profile()
+async def post_cv_chair(
+    video: UploadFile = File(...),
+    profile_id: int | None = Query(None),
+) -> dict[str, Any]:
+    prof = await _require_profile(profile_id)
     age, sex = _profile_age_sex(prof)
     dest = _save_upload(video)
     try:

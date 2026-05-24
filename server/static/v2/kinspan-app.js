@@ -3,13 +3,17 @@
  */
 const SKIP_ONBOARDING_KEY = "kinspan_v2_skip_onboarding";
 const CAREGIVER_NAME_KEY = "kinspan_caregiver_name";
+const ACTIVE_PROFILE_KEY = "kinspan_active_profile_id";
 
 const SCREENS_WITH_NAV = ["dashboard", "tests", "graphs"];
 const API_FETCH = { cache: "no-store" };
 
 let snapshot = null;
 let profile = null;
+let profiles = [];
 let history = null;
+let profileEditingId = null;
+let profileCreateMode = false;
 let currentScreen = "onboarding";
 let parentName = "Mom/Dad";
 let ringChart = null;
@@ -18,14 +22,39 @@ let ringBuilt = false;
 let graphsBuilt = false;
 
 // ---- API ----
+function activeProfileId() {
+  return localStorage.getItem(ACTIVE_PROFILE_KEY);
+}
+
+function setActiveProfileId(id) {
+  if (id == null || id === "") localStorage.removeItem(ACTIVE_PROFILE_KEY);
+  else localStorage.setItem(ACTIVE_PROFILE_KEY, String(id));
+}
+
+function withProfile(path) {
+  const id = activeProfileId();
+  if (!id || !path.startsWith("/api/")) return path;
+  if (
+    path.startsWith("/api/health") ||
+    path.startsWith("/api/profiles") ||
+    path.startsWith("/api/version") ||
+    path.startsWith("/api/paths") ||
+    path.startsWith("/api/reset")
+  ) {
+    return path;
+  }
+  const sep = path.includes("?") ? "&" : "?";
+  return `${path}${sep}profile_id=${encodeURIComponent(id)}`;
+}
+
 async function apiGet(path) {
-  const r = await fetch(path, API_FETCH);
+  const r = await fetch(withProfile(path), API_FETCH);
   if (!r.ok) throw new Error(await r.text() || r.statusText);
   return r.json();
 }
 
 async function apiPost(path, body) {
-  const r = await fetch(path, {
+  const r = await fetch(withProfile(path), {
     ...API_FETCH,
     method: "POST",
     headers: { "Content-Type": "application/json" },
@@ -36,7 +65,7 @@ async function apiPost(path, body) {
 }
 
 async function apiPut(path, body) {
-  const r = await fetch(path, {
+  const r = await fetch(withProfile(path), {
     ...API_FETCH,
     method: "PUT",
     headers: { "Content-Type": "application/json" },
@@ -80,9 +109,22 @@ function applyNames() {
   });
 }
 
+async function loadProfiles() {
+  const data = await apiGet("/api/profiles");
+  profiles = data.profiles || [];
+  return profiles;
+}
+
 async function loadProfile() {
+  if (!activeProfileId() && !profiles.length) {
+    profile = null;
+    parentName = "Parent";
+    applyNames();
+    return null;
+  }
   profile = await apiGet("/api/profile");
-  parentName = profile.display_name || "Mom/Dad";
+  parentName = profile.display_name || "Parent";
+  if (profile.id) setActiveProfileId(profile.id);
   applyNames();
   return profile;
 }
@@ -138,7 +180,7 @@ function goTo(id) {
   if (id === "walk") resetWalkUi();
   if (id === "chair-rise") resetChairRiseUi();
   if (id === "reaction") resetReactionUi();
-  if (id === "profile") loadProfileForm();
+  if (id === "profile") loadProfileForm(profileEditingId, profileCreateMode);
 
   window.scrollTo(0, 0);
 }
@@ -174,7 +216,17 @@ function obNext() {
 
 function finishOnboarding() {
   sessionStorage.setItem(SKIP_ONBOARDING_KEY, "1");
-  goTo("dashboard");
+  routeAfterAuth();
+}
+
+function routeAfterAuth() {
+  if (!profiles.length) {
+    profileCreateMode = true;
+    profileEditingId = null;
+    goTo("journal-select");
+  } else {
+    goTo("dashboard");
+  }
 }
 
 function skipOnboarding() {
@@ -190,39 +242,101 @@ function lastUpdatedIso() {
   return profile?.created_at;
 }
 
+function openProfileEditor(id, create) {
+  profileCreateMode = !!create;
+  profileEditingId = create ? null : id;
+  goTo("profile");
+}
+
 function renderJournals() {
   const area = document.getElementById("journalCarousel");
   if (!area) return;
-  const last = lastUpdatedIso();
-  const ago = daysAgo(last);
-  const due =
-    !snapshot?.categories?.length || (ago && ago !== "today" && !ago.includes("0 day"));
-  area.innerHTML = `
-    <div class="ghost-card ghost-left"></div>
-    <div class="journal-card" data-open-dash>
-      <div class="journal-avatar">${leafSvg("#6B8F71")}</div>
-      <h3>${escapeHtml(parentName)}</h3>
-      <div class="j-updated">Last updated: ${fmtDate(last)}</div>
-      ${due ? '<div class="j-badge">⏱ Check-in due</div>' : '<div class="j-badge" style="background:rgba(107,143,113,0.15);color:var(--sage-dark)">On track</div>'}
-      <button type="button" class="go-btn">Open Dashboard →</button>
-    </div>
-    <div class="journal-card" data-open-profile>
-      <div class="journal-avatar">+</div>
-      <h3>Parent profile</h3>
-      <div class="j-updated">Age &amp; sex for norms</div>
-      <button type="button" class="go-btn">Edit profile →</button>
-    </div>
-    <div class="ghost-card ghost-right"></div>
-  `;
-  area.querySelector("[data-open-dash]")?.addEventListener("click", () => goTo("dashboard"));
-  area.querySelector("[data-open-profile]")?.addEventListener("click", () => goTo("profile"));
 
+  if (!profiles.length) {
+    area.innerHTML = `
+      <div class="journal-card journal-card--solo" data-add-parent>
+        <div class="journal-avatar journal-avatar--add">+</div>
+        <h3>Add your first parent</h3>
+        <div class="j-updated">Name, age, and sex for fair comparisons</div>
+        <button type="button" class="go-btn">Create profile →</button>
+      </div>`;
+    area.querySelector("[data-add-parent]")?.addEventListener("click", (e) => {
+      e.stopPropagation();
+      openProfileEditor(null, true);
+    });
+    const splashSub = document.getElementById("splashSub");
+    if (splashSub) splashSub.textContent = "Create a profile to begin";
+    return;
+  }
+
+  const cards = profiles
+    .map((p) => {
+      const isActive = String(p.id) === String(activeProfileId());
+      return `
+    <div class="journal-card${isActive ? " journal-card--active" : ""}" data-profile-id="${p.id}">
+      <button type="button" class="journal-edit" data-edit-id="${p.id}">Edit</button>
+      <div class="journal-avatar">${leafSvg("#6B8F71")}</div>
+      <h3>${escapeHtml(p.display_name || "Parent")}</h3>
+      <div class="j-updated">Age ${p.age || "—"} · ${escapeHtml((p.sex || "").toString())}</div>
+      <button type="button" class="go-btn">${isActive ? "Open dashboard →" : "Select →"}</button>
+    </div>`;
+    })
+    .join("");
+
+  area.innerHTML = `
+    ${profiles.length > 1 ? '<div class="ghost-card ghost-left"></div>' : ""}
+    ${cards}
+    <div class="journal-card journal-card--add" data-add-parent>
+      <div class="journal-avatar journal-avatar--add">+</div>
+      <h3>Add another parent</h3>
+      <div class="j-updated">Separate journal per parent</div>
+      <button type="button" class="go-btn">New profile →</button>
+    </div>
+    ${profiles.length > 1 ? '<div class="ghost-card ghost-right"></div>' : ""}
+  `;
+
+  area.querySelectorAll("[data-profile-id]").forEach((card) => {
+    card.addEventListener("click", async (e) => {
+      if (e.target.closest(".journal-edit")) return;
+      const id = card.getAttribute("data-profile-id");
+      setActiveProfileId(id);
+      await loadProfile();
+      try {
+        await loadSnapshot();
+        await loadHistory();
+      } catch {
+        snapshot = null;
+        history = null;
+      }
+      goTo("dashboard");
+    });
+  });
+
+  area.querySelectorAll(".journal-edit").forEach((btn) => {
+    btn.addEventListener("click", (e) => {
+      e.stopPropagation();
+      openProfileEditor(btn.getAttribute("data-edit-id"), false);
+    });
+  });
+
+  area.querySelector("[data-add-parent]")?.addEventListener("click", (e) => {
+    e.stopPropagation();
+    openProfileEditor(null, true);
+  });
+
+  const active = profiles.find((p) => String(p.id) === String(activeProfileId()));
   const splashSub = document.getElementById("splashSub");
   if (splashSub) {
-    splashSub.textContent = `${parentName}'s journal is waiting`;
+    splashSub.textContent = active
+      ? `${active.display_name}'s journal is waiting`
+      : "Select a journal to continue";
   }
   const splashAgo = document.getElementById("splashLastCheckin");
-  if (splashAgo) splashAgo.textContent = last ? `Last check-in: ${ago || fmtDate(last)}` : "No check-ins yet";
+  if (splashAgo) {
+    const last = lastUpdatedIso();
+    const ago = daysAgo(last);
+    splashAgo.textContent = last ? `Last check-in: ${ago || fmtDate(last)}` : "No check-ins yet";
+  }
 }
 
 function leafSvg(fill) {
@@ -605,20 +719,40 @@ function setupReaction() {
 }
 
 // ---- Profile ----
-function loadProfileForm() {
-  apiGet("/api/profile")
-    .then((p) => {
-      document.getElementById("profName").value = p.display_name || "";
-      document.getElementById("profAge").value = p.age || 68;
-      document.getElementById("profSex").value = (p.sex || "female")
-        .toLowerCase()
-        .includes("male")
-        ? "male"
-        : "female";
-      const cg = document.getElementById("caregiverName");
-      if (cg) cg.value = caregiverName();
-    })
-    .catch(() => {});
+function loadProfileForm(editId, creating) {
+  const title = document.getElementById("profTitle");
+  const sub = document.getElementById("profSub");
+  const saveBtn = document.getElementById("saveProf");
+  if (creating) {
+    if (title) title.textContent = "Add parent";
+    if (sub) sub.textContent = "Set up their profile for fair comparisons";
+    if (saveBtn) saveBtn.textContent = "Create profile";
+    document.getElementById("profName").value = "";
+    document.getElementById("profAge").value = 68;
+    document.getElementById("profSex").value = "female";
+  } else {
+    if (title) title.textContent = "Parent profile";
+    if (sub) sub.textContent = "Age & sex for fair norm comparison";
+    if (saveBtn) saveBtn.textContent = "Save profile";
+    const id = editId || activeProfileId();
+    if (id) {
+      apiGet(`/api/profile?profile_id=${encodeURIComponent(id)}`)
+        .then((p) => {
+          document.getElementById("profName").value = p.display_name || "";
+          document.getElementById("profAge").value = p.age || 68;
+          document.getElementById("profSex").value = (p.sex || "female")
+            .toLowerCase()
+            .includes("male")
+            ? "male"
+            : "female";
+        })
+        .catch(() => {});
+    }
+  }
+  const cg = document.getElementById("caregiverName");
+  if (cg) cg.value = caregiverName();
+  const out = document.getElementById("profOut");
+  if (out) out.classList.remove("show");
 }
 
 function setupProfile() {
@@ -626,20 +760,53 @@ function setupProfile() {
     const out = document.getElementById("profOut");
     const cg = document.getElementById("caregiverName")?.value?.trim();
     if (cg) localStorage.setItem(CAREGIVER_NAME_KEY, cg);
+    const body = {
+      display_name: document.getElementById("profName").value.trim(),
+      age: +document.getElementById("profAge").value,
+      sex: document.getElementById("profSex").value,
+    };
+    if (!body.display_name) {
+      if (out) {
+        out.textContent = "Please enter a name.";
+        out.classList.add("show");
+      }
+      return;
+    }
     try {
-      const p = await apiPut("/api/profile", {
-        display_name: document.getElementById("profName").value,
-        age: +document.getElementById("profAge").value,
-        sex: document.getElementById("profSex").value,
-      });
+      let p;
+      if (profileCreateMode) {
+        const r = await fetch("/api/profiles", {
+          ...API_FETCH,
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(body),
+        });
+        if (!r.ok) throw new Error(await r.text() || r.statusText);
+        p = await r.json();
+        setActiveProfileId(p.id);
+        profileCreateMode = false;
+        profileEditingId = null;
+      } else {
+        const q = profileEditingId || activeProfileId();
+        p = await apiPut(`/api/profile${q ? `?profile_id=${q}` : ""}`, body);
+      }
       parentName = p.display_name;
+      profile = p;
       applyNames();
+      await loadProfiles();
       if (out) {
         out.textContent = `Saved: ${p.display_name}, age ${p.age}`;
         out.classList.add("show");
       }
-      await loadSnapshot();
+      try {
+        await loadSnapshot();
+        await loadHistory();
+      } catch {
+        snapshot = null;
+        history = null;
+      }
       renderJournals();
+      setTimeout(() => goTo("dashboard"), 600);
     } catch (e) {
       if (out) {
         out.textContent = e.message;
@@ -809,22 +976,34 @@ function renderGraphs(force) {
 
 // ---- Init ----
 async function init() {
+  setupWalk();
+  setupChairRise();
+  setupReaction();
+  setupProfile();
+
   try {
-    await loadProfile();
-    await loadSnapshot();
-    await loadHistory();
+    await loadProfiles();
+    if (profiles.length) {
+      const stored = activeProfileId();
+      const match = profiles.find((p) => String(p.id) === stored);
+      if (!match) setActiveProfileId(profiles[0].id);
+      await loadProfile();
+      try {
+        await loadSnapshot();
+        await loadHistory();
+      } catch {
+        snapshot = null;
+        history = null;
+      }
+    }
     renderJournals();
-    setupWalk();
-    setupChairRise();
-    setupReaction();
-    setupProfile();
   } catch (e) {
     console.warn("KinSpan init:", e);
     t("toastDash", "API offline — start server on port 8003");
   }
 
   if (sessionStorage.getItem(SKIP_ONBOARDING_KEY) === "1") {
-    goTo("dashboard");
+    routeAfterAuth();
   } else {
     goTo("onboarding");
   }

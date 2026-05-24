@@ -44,8 +44,13 @@ body{font-family:'DM Sans',sans-serif;background:#1a1f1c;display:flex;justify-co
 .journal-header h1{font-family:'Lora',serif;font-size:32px;font-weight:600;margin-bottom:10px}
 .journal-header p{font-size:14px;opacity:0.78;border:1px solid rgba(255,255,255,0.33);border-radius:12px;padding:10px 16px;font-weight:300}
 .carousel-area{flex:1;display:flex;align-items:center;justify-content:center;position:relative;overflow:hidden}
-.journal-card{background:var(--cream);border-radius:24px;padding:26px 22px 22px;width:216px;text-align:center;cursor:pointer;transition:transform 0.2s;box-shadow:0 8px 30px rgba(0,0,0,0.2)}
+.journal-card{background:var(--cream);border-radius:24px;padding:26px 22px 22px;width:216px;text-align:center;cursor:pointer;transition:transform 0.2s,border-color 0.2s;box-shadow:0 8px 30px rgba(0,0,0,0.2);position:relative;border:2px solid transparent}
 .journal-card:hover{transform:scale(1.02)}
+.journal-card--active{border-color:var(--sage)}
+.journal-card--solo,.journal-card--add{max-width:240px;margin:0 auto}
+.journal-edit{position:absolute;top:10px;right:10px;z-index:2;background:rgba(255,255,255,0.92);border:1px solid rgba(0,0,0,0.08);border-radius:999px;padding:5px 11px;font-size:11px;font-weight:600;font-family:'DM Sans',sans-serif;color:var(--sage-dark);cursor:pointer}
+.journal-edit:hover{background:var(--sage-pale)}
+.journal-avatar--add{font-size:28px;font-weight:300;color:var(--sage-dark);background:var(--sage-pale)}
 .journal-avatar{width:78px;height:78px;background:var(--charcoal);border-radius:50%;margin:0 auto 13px;display:flex;align-items:center;justify-content:center}
 .journal-card h3{font-family:'Lora',serif;font-size:17px;color:var(--text);margin-bottom:4px}
 .j-updated{font-size:11px;color:var(--text-muted);font-style:italic;margin-bottom:6px}
