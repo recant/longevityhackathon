@@ -238,9 +238,14 @@ def _brand_html(text: str) -> str:
     text = text.replace("The first steps of their Longevity Journey", "")
     text = text.replace("CV engine: opencv — pip install mediapipe for better pose tracking", "")
     text = text.replace("CV engine: opencv - pip install mediapipe for better pose tracking", "")
-    script = '<script src="/v2/longevitree-brand-patch.js"></script>'
-    if script not in text and "</body>" in text:
-        text = text.replace("</body>", f"{script}\n</body>")
+    scripts = [
+        '<script src="/v2/classic-workflow-guard.js"></script>',
+        '<script src="/v2/longevitree-brand-patch.js"></script>',
+    ]
+    if "</body>" in text:
+        for script in scripts:
+            if script not in text:
+                text = text.replace("</body>", f"{script}\n</body>")
     return text
 
 
