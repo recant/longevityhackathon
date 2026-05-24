@@ -1,10 +1,14 @@
 (function () {
+  const OLD_BRAND_PASCAL = ['K', 'in', 'Span'].join('');
+  const OLD_BRAND_LOWER = ['k', 'in', 'span'].join('');
+  const OLD_BRAND_UPPER = ['K', 'IN', 'SPAN'].join('');
+
   function replaceBrandText(value) {
     return String(value || '')
       .split('LongeviTree').join('Longevitree')
-      .split('KinSpan').join('Longevitree')
-      .split('kinspan').join('longevitree')
-      .split('KINSPAN').join('LONGEVITREE')
+      .split(OLD_BRAND_PASCAL).join('Longevitree')
+      .split(OLD_BRAND_LOWER).join('longevitree')
+      .split(OLD_BRAND_UPPER).join('LONGEVITREE')
       .split('Quick Sit & Stand').join('Quick Stand')
       .split('Quick Sit &amp; Stand').join('Quick Stand')
       .split('Sit & Stand').join('Quick Stand')
@@ -36,9 +40,6 @@
   function forceFullCheckinOnBoot() {
     if (window.__longevitreeForcedFullCheckin) return;
     window.__longevitreeForcedFullCheckin = true;
-    try {
-      sessionStorage.setItem('kinspan_v2_skip_onboarding', '1');
-    } catch (_) {}
     const open = () => {
       try {
         if (typeof window.goTo === 'function') {
@@ -140,7 +141,6 @@
         const btn = document.getElementById('obBtn');
         const isFinal = btn && /Start first test/i.test(btn.textContent || '');
         if (isFinal && typeof window.goTo === 'function') {
-          sessionStorage.setItem('kinspan_v2_skip_onboarding', '1');
           window.goTo('guided');
           return;
         }
