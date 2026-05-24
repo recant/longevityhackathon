@@ -24,8 +24,8 @@ def _mock_insight(profile: dict[str, Any], snapshot: dict[str, Any]) -> dict[str
             "for personalized 'explain like a caring family member' text."
         ),
         "conversation_tip": (
-            f"Try: '{name}, I found a calm app that helps our family notice energy and "
-            "movement over time — not doctors, just trends. Want to do a short walk test with me?'"
+            "Use this as a low-pressure family check-in: focus on energy, movement, and small habits "
+            "over time rather than turning the conversation into a medical evaluation."
         ),
         "what_changed": what,
         "mock": True,
