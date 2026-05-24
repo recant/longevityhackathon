@@ -24,6 +24,7 @@ from database import (
     update_profile,
 )
 from insights import generate_insights
+from interventions import generate_interventions
 from scoring import (
     TRACKING_CHECKLIST,
     compute_trend,
@@ -122,6 +123,7 @@ def _build_snapshot(profile: dict[str, Any], history: dict[str, Any]) -> dict[st
         "overall": overall,
         "categories": categories,
         "actions": default_actions(categories),
+        "interventions": generate_interventions(categories, profile),
         "tracking_checklist": TRACKING_CHECKLIST,
         "history_counts": {
             "reactions": len(reactions),
