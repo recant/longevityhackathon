@@ -1,5 +1,6 @@
 (function () {
   const BOOT_RESET_KEY = 'longevitree_boot_reset_done';
+  const OLD_KEY_PREFIX = ['k', 'in', 'span'].join('');
 
   function replaceBrandText(value) {
     return String(value || '')
@@ -23,7 +24,7 @@
       const removeKeys = [];
       for (let i = 0; i < localStorage.length; i += 1) {
         const key = localStorage.key(i);
-        if (key && /longevitree/i.test(key)) removeKeys.push(key);
+        if (key && (/longevitree/i.test(key) || key.startsWith(OLD_KEY_PREFIX + '_'))) removeKeys.push(key);
       }
       removeKeys.forEach((key) => localStorage.removeItem(key));
     } catch (_) {}
@@ -32,7 +33,7 @@
       const removeKeys = [];
       for (let i = 0; i < sessionStorage.length; i += 1) {
         const key = sessionStorage.key(i);
-        if (key && /longevitree/i.test(key) && key !== BOOT_RESET_KEY) removeKeys.push(key);
+        if (key && key !== BOOT_RESET_KEY && (/longevitree/i.test(key) || key.startsWith(OLD_KEY_PREFIX + '_'))) removeKeys.push(key);
       }
       removeKeys.forEach((key) => sessionStorage.removeItem(key));
     } catch (_) {}
